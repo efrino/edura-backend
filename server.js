@@ -7,10 +7,17 @@ const path = require('path');
 require('dotenv').config();
 
 const init = async () => {
+    // Render will provide PORT automatically via environment variable
+    const port = process.env.PORT || 10000;
+
     const server = Hapi.server({
-        port: process.env.PORT || 3000,
-        host: 'localhost',
-        routes: { cors: true },
+        port: port,
+        host: '0.0.0.0', // Required by Render for public HTTP binding
+        routes: {
+            cors: {
+                origin: ['*'], // Optional: allows requests from any origin
+            },
+        },
     });
 
     const swaggerOptions = {
@@ -18,8 +25,8 @@ const init = async () => {
             title: '📘 LMS Auth API',
             version: '1.0.0',
         },
-        documentationPath: '/', // Swagger UI at root
-        grouping: 'tags',        // ⬅️ Grouping berdasarkan tag
+        documentationPath: '/',
+        grouping: 'tags',
     };
 
     await server.register([
@@ -28,7 +35,7 @@ const init = async () => {
         { plugin: HapiSwagger, options: swaggerOptions },
     ]);
 
-    // ⬇️ Autoload semua route plugin dari folder /routes
+    // Auto-load all route plugins from the /routes folder
     const routeFiles = fs.readdirSync(path.join(__dirname, 'routes'))
         .filter(f => f.endsWith('.js'));
 
@@ -38,10 +45,10 @@ const init = async () => {
     }
 
     await server.start();
-    console.log('🚀 Server:', server.info.uri);
+    console.log(`🚀 Server running at: ${server.info.uri}`);
 };
 
-process.on('unhandledRejection', err => {
+process.on('unhandledRejection', (err) => {
     console.error(err);
     process.exit(1);
 });
