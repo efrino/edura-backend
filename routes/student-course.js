@@ -11,7 +11,7 @@ module.exports = {
             method: 'GET',
             path: '/student/courses',
             options: {
-                tags: ['api', 'Student'],
+                tags: ['api', 'Course'],
                 description: 'Get student enrolled courses with progress',
                 pre: [verifyToken, requireRole('student')],
             },
@@ -55,8 +55,8 @@ module.exports = {
             method: 'PUT',
             path: '/student/courses/{courseId}/checkpoint',
             options: {
-                tags: ['api', 'Student'],
-                description: 'Update checkpoint progress student',
+                tags: ['api', 'Course'],
+                description: 'Update checkpoint progress student (increment only)',
                 pre: [verifyToken, requireRole('student')],
                 validate: {
                     payload: Joi.object({
@@ -72,6 +72,7 @@ module.exports = {
                 const { courseId } = request.params;
                 const { checkpoint } = request.payload;
 
+                // Dapatkan total sesi dari course
                 const { count, error: sessionError } = await supabase
                     .from('course_sessions')
                     .select('id', { count: 'exact', head: true })
@@ -82,15 +83,45 @@ module.exports = {
                     return h.response({ message: 'Gagal mengambil data sesi' }).code(500);
                 }
 
-                if (checkpoint > count) {
-                    return h.response({ message: 'Checkpoint melebihi jumlah sesi' }).code(400);
+                // Ambil progress student saat ini
+                const { data: studentProgress, error: progressError } = await supabase
+                    .from('student_courses')
+                    .select('checkpoint')
+                    .eq('student_id', studentId)
+                    .eq('course_id', courseId)
+                    .single();
+
+                if (progressError) {
+                    console.error(progressError);
+                    return h.response({ message: 'Gagal mengambil progres saat ini' }).code(500);
                 }
+
+                const currentCheckpoint = studentProgress.checkpoint;
+
+                if (checkpoint <= currentCheckpoint) {
+                    return h.response({
+                        message: `Anda sudah menyelesaikan chapter ini. Progress Anda saat ini di checkpoint ke-${currentCheckpoint}.`,
+                        current_checkpoint: currentCheckpoint,
+                        percentage: Math.round((currentCheckpoint / count) * 100)
+                    }).code(400);
+                }
+
+                if (checkpoint > currentCheckpoint + 1) {
+                    return h.response({
+                        message: `Tidak bisa melompati chapter. Anda hanya dapat menyelesaikan checkpoint ke-${currentCheckpoint + 1} saat ini.`,
+                        current_checkpoint: currentCheckpoint,
+                        percentage: Math.round((currentCheckpoint / count) * 100)
+                    }).code(400);
+                }
+
+                const isCompleted = checkpoint === count;
 
                 const { error: updateError } = await supabase
                     .from('student_courses')
                     .update({
                         checkpoint,
-                        is_completed: checkpoint === count,
+                        is_completed: isCompleted,
+                        updated_at: new Date().toISOString(),
                     })
                     .eq('student_id', studentId)
                     .eq('course_id', courseId);
@@ -100,8 +131,13 @@ module.exports = {
                     return h.response({ message: 'Gagal update checkpoint' }).code(500);
                 }
 
-                return h.response({ message: 'Progress berhasil diperbarui' }).code(200);
+                return h.response({
+                    message: 'Checkpoint berhasil diperbarui',
+                    checkpoint,
+                    percentage: Math.round((checkpoint / count) * 100),
+                    is_completed: isCompleted
+                }).code(200);
             },
         });
-    },
+    }
 };

@@ -1,10 +1,11 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); // ✅ tambahkan ini
 const db = require('../db');
+const { hashToken } = require('../utils/hash');
 const {
     sendOtpEmail,
     sendMagicLinkEmail,
-    sendPasswordResetOtp
+    sendPasswordResetLink
 } = require('../utils/email');
 const Joi = require('joi');
 const { v4: uuidv4 } = require('uuid');
@@ -219,7 +220,6 @@ module.exports = {
             },
 
 
-            // 🔁 POST /forgot-password - kirim OTP
             {
                 method: 'POST',
                 path: '/forgot-password',
@@ -233,22 +233,49 @@ module.exports = {
                 },
                 handler: async (req, h) => {
                     const { email } = req.payload;
-                    const { rows } = await db.query('SELECT * FROM public.users WHERE email = $1', [email]);
-                    if (rows.length === 0) return h.response({ error: 'Email not found' }).code(404);
 
-                    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-                    const expiry = new Date(Date.now() + 5 * 60000);
+                    try {
+                        const { data: user, error } = await db
+                            .from('users')
+                            .select('id, email')
+                            .eq('email', email)
+                            .maybeSingle();
 
-                    await db.query(`
-                        UPDATE public.users SET otp_code = $1, otp_expires_at = $2 WHERE email = $3
-                    `, [otp, expiry, email]);
+                        if (error) {
+                            console.error('❌ [Forgot Password] Supabase error:', error.message);
+                            throw error;
+                        }
 
-                    await sendPasswordResetOtp(email, otp);
-                    return { message: 'OTP sent to email for password reset' };
-                },
+                        // Tetap response netral untuk keamanan
+                        if (!user) {
+                            console.warn('⚠️ [Forgot Password] Email tidak ditemukan:', email);
+                            return { message: 'If this email is registered, a reset link has been sent.' };
+                        }
+
+                        const token = uuidv4();
+                        const hashedToken = hashToken(token);
+                        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam dari sekarang
+
+                        console.log('🔑 [Forgot Password] Token (plain):', token);
+                        console.log('🔒 [Forgot Password] Token (hashed):', hashedToken);
+                        console.log('🕓 [Forgot Password] Expired At:', expiresAt.toISOString());
+
+                        await db.from('users').update({
+                            reset_token: hashedToken,
+                            reset_expires_at: expiresAt.toISOString(),
+                        }).eq('id', user.id);
+
+                        await sendPasswordResetLink(email, token);
+
+                        console.log('📧 [Forgot Password] Reset link sent to:', email);
+
+                        return { message: 'If this email is registered, a reset link has been sent.' };
+                    } catch (err) {
+                        console.error('🔥 [Forgot Password] Internal error:', err);
+                        return h.response({ error: 'Internal Server Error' }).code(500);
+                    }
+                }
             },
-
-            // 🔁 POST /reset-password - validasi OTP lalu reset password
             {
                 method: 'POST',
                 path: '/reset-password',
@@ -256,34 +283,73 @@ module.exports = {
                     tags: ['api'],
                     validate: {
                         payload: Joi.object({
-                            email: Joi.string().email().required(),
-                            otp: Joi.string().required(),
+                            token: Joi.string().required(),
                             new_password: Joi.string().min(6).required(),
                         }),
                     },
                 },
                 handler: async (req, h) => {
-                    const { email, otp, new_password } = req.payload;
+                    const { token, new_password } = req.payload;
+                    const hashedToken = hashToken(token);
 
-                    const { rows } = await db.query('SELECT * FROM public.users WHERE email = $1', [email]);
-                    if (rows.length === 0) return h.response({ error: 'Email not found' }).code(404);
+                    // 🧾 Log input token & hashed token
+                    console.log('🔑 [Reset Password] Token (plain):', token);
+                    console.log('🔒 [Reset Password] Token (hashed):', hashedToken);
 
-                    const user = rows[0];
-                    if (user.otp_code !== otp || new Date() > new Date(user.otp_expires_at)) {
-                        return h.response({ error: 'Invalid or expired OTP' }).code(401);
+                    try {
+                        const { data: user, error } = await db
+                            .from('users')
+                            .select('*')
+                            .eq('reset_token', hashedToken)
+                            .maybeSingle();
+
+                        // 🧾 Log hasil query ke Supabase
+                        if (error) {
+                            console.error('❌ [Reset Password] Supabase error:', error.message);
+                            throw error;
+                        }
+
+                        if (!user) {
+                            console.warn('⚠️ [Reset Password] Token tidak cocok dengan user manapun');
+                            return h.response({ error: 'Invalid or expired token' }).code(401);
+                        }
+
+                        console.log('✅ [Reset Password] User ditemukan:', user.email || user.id);
+
+                        if (!user.reset_expires_at) {
+                            console.warn('⚠️ [Reset Password] Tidak ada field reset_expires_at');
+                            return h.response({ error: 'Invalid or expired token' }).code(401);
+                        }
+
+                        const now = Date.now();
+                        const expiresAt = new Date(user.reset_expires_at).getTime();
+
+                        console.log('🕒 [Reset Password] Sekarang:', new Date(now).toISOString());
+                        console.log('🕓 [Reset Password] Expired At:', new Date(expiresAt).toISOString());
+
+                        if (now > expiresAt) {
+                            console.warn('⚠️ [Reset Password] Token sudah expired');
+                            return h.response({ error: 'Invalid or expired token' }).code(401);
+                        }
+
+                        const hashedPassword = await bcrypt.hash(new_password, 10);
+
+                        await db.from('users').update({
+                            password_hash: hashedPassword,
+                            reset_token: null,
+                            reset_expires_at: null
+                        }).eq('id', user.id);
+
+                        console.log('✅ [Reset Password] Password berhasil direset untuk:', user.email || user.id);
+
+                        return { message: 'Password has been reset successfully' };
+
+                    } catch (err) {
+                        console.error('🔥 Error /reset-password', err);
+                        return h.response({ error: 'Internal Server Error' }).code(500);
                     }
-
-                    const hashedPassword = await bcrypt.hash(new_password, 10);
-                    await db.query(`
-                        UPDATE public.users
-                        SET password_hash = $1, otp_code = NULL, otp_expires_at = NULL
-                        WHERE email = $2
-                    `, [hashedPassword, email]);
-
-                    return { message: 'Password has been reset successfully' };
-                },
+                }
             },
-
             // ✅ POST /verify-otp
             {
                 method: 'POST',
@@ -343,7 +409,54 @@ module.exports = {
                     }
                 },
             },
+            {
+                method: 'POST',
+                path: '/resend-otp',
+                options: {
+                    tags: ['api'],
+                    validate: {
+                        payload: Joi.object({
+                            email: Joi.string().email().required(),
+                        }),
+                    },
+                },
+                handler: async (req, h) => {
+                    const { email } = req.payload;
 
+                    try {
+                        const { data: user, error: e1 } = await db
+                            .from('users')
+                            .select('*')
+                            .eq('email', email)
+                            .maybeSingle();
+
+                        if (e1) throw e1;
+                        if (!user) return h.response({ error: 'Email not found' }).code(404);
+                        if (!user.is_verified) return h.response({ error: 'Email not verified' }).code(401);
+
+                        const now = new Date();
+                        const isExpired = !user.otp_expires_at || new Date(user.otp_expires_at) < now;
+
+                        if (!isExpired) {
+                            return h.response({ message: 'OTP is still valid. Please check your email.' });
+                        }
+
+                        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                        const expiry = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+
+                        await db.from('users').update({
+                            otp_code: otp,
+                            otp_expires_at: expiry
+                        }).eq('id', user.id);
+
+                        await sendOtpEmail(email, otp);
+                        return { message: 'New OTP sent to your email' };
+                    } catch (err) {
+                        console.error('🔥 Error /resend-otp', err);
+                        return h.response({ error: 'Internal Server Error' }).code(500);
+                    }
+                },
+            },
         ];
         // Tambahkan tag 'Authentikasi' ke semua route
         routes.forEach(route => {
@@ -355,3 +468,4 @@ module.exports = {
         server.route(routes);
     },
 };
+

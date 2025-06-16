@@ -74,31 +74,32 @@ async function sendOtpEmail(to, otp) {
     });
 }
 
-// ♻️ Kirim OTP reset password
-async function sendPasswordResetOtp(to, otp) {
-    const html = emailLayout({
-        title: 'Reset Your LMS Password',
-        body: `
-            <p>Hello,</p>
-            <p>Use the OTP code below to reset your password:</p>
-            <div style="text-align: center; margin: 20px 0;">
-                <span style="font-size: 28px; letter-spacing: 5px; font-weight: bold; color: #e67e22;">${otp}</span>
-            </div>
-            <p>This OTP will expire in <strong>5 minutes</strong>.</p>
-            <p>If you didn’t request this reset, please ignore this email.</p>
-        `
-    });
+async function sendPasswordResetLink(to, token) {
+  const link = `${process.env.APP_BASE_URL}/reset-password?token=${token}`;
+  const html = emailLayout({
+    title: 'Reset Your Password',
+    body: `
+      <p>Hello,</p>
+      <p>Click the button below to reset your LMS account password:</p>
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${link}" style="background-color: #e67e22; color: white; padding: 12px 20px; border-radius: 5px; text-decoration: none;">Reset Password</a>
+      </div>
+      <p>If the button above doesn't work, copy and paste this URL into your browser:</p>
+      <code style="background-color: #f0f0f0; padding: 8px; display: block; word-break: break-all;">${link}</code>
+      <p>This link will expire in <strong>1 hour</strong>.</p>
+    `
+  });
 
-    await transporter.sendMail({
-        from: '"LMS Recovery" <noreply@lms.dev>',
-        to,
-        subject: 'Reset Your LMS Password',
-        html
-    });
+  await transporter.sendMail({
+    from: '"LMS Recovery" <noreply@lms.dev>',
+    to,
+    subject: 'Reset Your LMS Password',
+    html
+  });
 }
 
 module.exports = {
     sendMagicLinkEmail,
     sendOtpEmail,
-    sendPasswordResetOtp
+    sendPasswordResetLink
 };
