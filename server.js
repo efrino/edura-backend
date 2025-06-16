@@ -5,6 +5,8 @@ const HapiSwagger = require('hapi-swagger');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+const { verifyToken } = require('./utils/middleware');
+
 
 const init = async () => {
     // Render will provide PORT automatically via environment variable
@@ -34,7 +36,16 @@ const init = async () => {
         Vision,
         { plugin: HapiSwagger, options: swaggerOptions },
     ]);
+    server.auth.scheme('custom-jwt', function () {
+        return {
+            authenticate: async function (request, h) {
+                await verifyToken(request, h); // inject ke request.auth
+                return h.authenticated({ credentials: request.auth.credentials });
+            },
+        };
+    });
 
+    server.auth.strategy('jwt', 'custom-jwt');
     // Auto-load all route plugins from the /routes folder
     const routeFiles = fs.readdirSync(path.join(__dirname, 'routes'))
         .filter(f => f.endsWith('.js'));
@@ -43,6 +54,8 @@ const init = async () => {
         const plugin = require(path.join(__dirname, 'routes', file));
         await server.register(plugin);
     }
+
+
 
     await server.start();
     console.log(`🚀 Server running at: ${server.info.uri}`);

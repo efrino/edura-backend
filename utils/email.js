@@ -30,7 +30,7 @@ function emailLayout({ title, body }) {
 
 // 🔗 Kirim magic link verifikasi email
 async function sendMagicLinkEmail(to, token) {
-    const link = `${process.env.APP_BASE_URL}/verify-email?token=${token}`;
+    const link = `${process.env.FRONTEND_BASE_URL}/verify-email?token=${token}`;
     const html = emailLayout({
         title: 'Verify Your Email Address',
         body: `
@@ -75,7 +75,7 @@ async function sendOtpEmail(to, otp) {
 }
 
 async function sendPasswordResetLink(to, token) {
-  const link = `${process.env.APP_BASE_URL}/reset-password?token=${token}`;
+  const link = `${process.env.FRONTEND_BASE_URL}/reset-password?token=${token}`;
   const html = emailLayout({
     title: 'Reset Your Password',
     body: `
