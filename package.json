@@ -26,6 +26,7 @@
     "hapi-swagger": "^17.3.2",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
+    "midtrans-client": "^1.4.3",
     "nodemailer": "^7.0.3",
     "pg": "^8.16.0",
     "uuid": "^11.1.0"
