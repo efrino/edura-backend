@@ -36,26 +36,56 @@ Contoh format output:
 
 // Parsing output dari Gemini
 function parseGeminiOutput(text) {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    console.log('\n[DEBUG Gemini Output]:\n', text); // 🧪 Cetak output mentah dari Gemini
 
-    const titleLine = lines.find(l => /^judul\s*[:\-]/i.test(l));
-    const descLine = lines.find(l => /^deskripsi\s*[:\-]/i.test(l));
-    const title = titleLine?.split(/[:\-]/)[1]?.trim() || 'Course Tanpa Judul';
-    const description = descLine?.split(/[:\-]/)[1]?.trim() || 'Tidak ada deskripsi.';
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    const sessionLines = lines.filter(l => /^\d+\./.test(l)).slice(0, 16);
+    let title = null;
+    let description = null;
 
-    if (sessionLines.length < 16) {
-        return { title: null, description: null, sessions: [] };
+    // Gabungkan semua baris menjadi satu blok teks
+    const fullText = lines.join('\n');
+
+    // Gunakan regex untuk mencari judul dan deskripsi dengan fleksibel
+    const titleMatch = fullText.match(/judul\s*[:\-]\s*(.+)/i);
+    const descMatch = fullText.match(/deskripsi\s*[:\-]\s*(.+)/i);
+
+    // Ambil hasil atau fallback
+    title = titleMatch?.[1]?.trim() || lines[0]; // Fallback: baris pertama
+    description = descMatch?.[1]?.trim() || lines[1]; // Fallback: baris kedua
+
+    // Ambil baris-baris yang merupakan sesi pertemuan (format: 1. Judul)
+    const sessionRegex = /^\d+\.\s*(.+)$/gm;
+    let match;
+    const sessions = [];
+    while ((match = sessionRegex.exec(fullText)) !== null && sessions.length < 16) {
+        sessions.push({
+            title: match[1].trim(),
+            content: {} // konten akan digenerate di tempat lain
+        });
     }
 
-    const sessions = sessionLines.map(line => ({
-        title: line.replace(/^\d+\.\s*/, '').trim(),
-        content: {}
-    }));
+    // Validasi hasil parsing
+    if (!title || !description || sessions.length !== 16) {
+        console.warn('\n[WARNING] Parsing gagal, hasil tidak lengkap:');
+        console.warn('Judul:', title);
+        console.warn('Deskripsi:', description);
+        console.warn('Jumlah sesi:', sessions.length);
+    } else {
+        console.log('\n[INFO] Parsing berhasil:');
+        console.log('Judul:', title);
+        console.log('Deskripsi:', description);
+        console.log('Jumlah sesi:', sessions.length);
+    }
 
-    return { title, description, sessions };
+    return {
+        title: title || 'Course Tanpa Judul',
+        description: description || 'Tidak ada deskripsi.',
+        sessions
+    };
 }
+
+
 
 module.exports = {
     name: 'course-routes',
