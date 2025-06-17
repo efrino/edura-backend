@@ -37,15 +37,23 @@ Contoh format output:
 // Parsing output dari Gemini
 function parseGeminiOutput(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
     const titleLine = lines.find(l => /^judul\s*[:\-]/i.test(l));
     const descLine = lines.find(l => /^deskripsi\s*[:\-]/i.test(l));
-    const title = titleLine?.split(/[:\-]/)[1]?.trim();
-    const description = descLine?.split(/[:\-]/)[1]?.trim();
-    const sessionLines = lines.filter(l => /^\d+\./.test(l));
+    const title = titleLine?.split(/[:\-]/)[1]?.trim() || 'Course Tanpa Judul';
+    const description = descLine?.split(/[:\-]/)[1]?.trim() || 'Tidak ada deskripsi.';
+
+    const sessionLines = lines.filter(l => /^\d+\./.test(l)).slice(0, 16);
+
+    if (sessionLines.length < 16) {
+        return { title: null, description: null, sessions: [] };
+    }
+
     const sessions = sessionLines.map(line => ({
         title: line.replace(/^\d+\.\s*/, '').trim(),
         content: {}
     }));
+
     return { title, description, sessions };
 }
 
@@ -71,7 +79,6 @@ module.exports = {
                 const { subject, level } = request.payload;
                 const userId = request.auth.credentials.id;
 
-                // Ambil program studi dan plan dari student
                 const { data: profile, error: profileError } = await supabase
                     .from('student_profiles')
                     .select('program_studi')
@@ -95,7 +102,6 @@ module.exports = {
                 const programStudi = profile.program_studi;
                 const userPlan = user.plan || 'free';
 
-                // Cek jumlah total course yang sudah dimiliki (generate maupun reuse)
                 if (userPlan === 'free') {
                     const { count, error: countError } = await supabase
                         .from('student_courses')
@@ -115,7 +121,6 @@ module.exports = {
                     }
                 }
 
-                // Cek apakah course dengan subject + level + program studi sudah ada
                 const { data: existingCourse, error: fetchError } = await supabase
                     .from('courses')
                     .select('id')
@@ -134,7 +139,6 @@ module.exports = {
                 if (existingCourse) {
                     courseId = existingCourse.id;
                 } else {
-                    // Generate course baru via Gemini
                     const prompt = `Buatkan course pembelajaran dengan level ${level} untuk program studi ${programStudi}.
 Topik utama course adalah "${subject}". Formatkan output sebagai berikut:
 
@@ -161,16 +165,18 @@ Berikut 16 pertemuan:
 
                     const parsed = parseGeminiOutput(generated);
                     if (!parsed.title || parsed.sessions.length !== 16) {
-                        return h.response({ message: 'Output Gemini tidak valid (judul atau jumlah sesi tidak sesuai)' }).code(400);
+                        console.warn('Gemini output:\n', generated);
+                        return h.response({
+                            message: 'Output Gemini tidak valid. Pastikan subject dan level spesifik.',
+                            error: 'Parsing gagal: jumlah sesi harus 16 dan harus ada judul.'
+                        }).code(400);
                     }
 
-                    // Generate konten tiap sesi
                     for (let i = 0; i < parsed.sessions.length; i++) {
                         const contentObj = await generateContentForTitle(parsed.sessions[i].title);
                         parsed.sessions[i].content = JSON.stringify(contentObj);
                     }
 
-                    // Simpan course baru
                     const { data: course, error: courseError } = await supabase
                         .from('courses')
                         .insert({
@@ -192,7 +198,6 @@ Berikut 16 pertemuan:
 
                     courseId = course.id;
 
-                    // Simpan sesi
                     const sessionsData = parsed.sessions.map((s, i) => ({
                         course_id: courseId,
                         session_number: i + 1,
@@ -210,7 +215,6 @@ Berikut 16 pertemuan:
                     }
                 }
 
-                // Cek dan tambahkan ke student_courses (jika belum pernah)
                 const { data: checkStudentCourse } = await supabase
                     .from('student_courses')
                     .select('id')
