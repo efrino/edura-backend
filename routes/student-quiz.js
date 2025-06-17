@@ -131,6 +131,48 @@ Jangan tambahkan penjelasan. Format harus berupa array JSON seperti ini:
                     questions,
                 }).code(201);
             }
-        });
+        },
+        );
+
+        server.route({
+            method: 'GET',
+            path: '/student/courses/{courseId}/sessions/{sessionNumber}/quiz',
+            options: {
+                tags: ['api', 'Quiz'],
+                description: 'Get quiz for a specific session in a course',
+                pre: [verifyToken, requireRole('student')],
+                validate: {
+                    params: Joi.object({
+                        courseId: Joi.string().guid().required(),
+                        sessionNumber: Joi.number().integer().min(1).max(16).required(),
+                    }),
+                },
+            },
+            handler: async (request, h) => {
+                const { courseId, sessionNumber } = request.params;
+
+                const { data: quiz, error } = await supabase
+                    .from('course_quizzes')
+                    .select('questions')
+                    .eq('course_id', courseId)
+                    .eq('session_number', sessionNumber)
+                    .maybeSingle();
+
+                if (error) {
+                    console.error(error);
+                    return h.response({ message: 'Gagal mengambil data quiz' }).code(500);
+                }
+
+                if (!quiz) {
+                    return h.response({ message: 'Quiz belum tersedia' }).code(404);
+                }
+
+                return h.response({
+                    message: 'Quiz ditemukan',
+                    questions: quiz.questions
+                }).code(200);
+            }
+        }
+        );
     },
 };

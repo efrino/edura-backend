@@ -5,6 +5,7 @@ require('dotenv').config();
 const transporter = nodemailer.createTransport({
     host: process.env.MAILTRAP_HOST,
     port: process.env.MAILTRAP_PORT,
+    secure: process.env.MAILTRAP_SECURE === 'true',
     auth: {
         user: process.env.MAILTRAP_USER,
         pass: process.env.MAILTRAP_PASS
@@ -20,17 +21,17 @@ function emailLayout({ title, body }) {
         </div>
         <div style="padding: 30px; font-size: 16px; color: #333;">
             ${body}
-            <p style="margin-top: 30px;">Thanks,<br><strong>LMS Team</strong></p>
+            <p style="margin-top: 30px;">Thanks,<br><strong>Edura Team</strong></p>
         </div>
         <div style="background-color: #f5f5f5; text-align: center; font-size: 12px; padding: 10px; color: #777;">
-            © ${new Date().getFullYear()} LMS Platform. All rights reserved.
+            © ${new Date().getFullYear()} Edura Platform. All rights reserved.
         </div>
     </div>`;
 }
 
 // 🔗 Kirim magic link verifikasi email
 async function sendMagicLinkEmail(to, token) {
-    const link = `${process.env.FRONTEND_BASE_URL}/verify-email?token=${token}`;
+    const link = `${process.env.FRONTEND_BASE_URL}#/verify-email?token=${token}`;
     const html = emailLayout({
         title: 'Verify Your Email Address',
         body: `
@@ -45,7 +46,7 @@ async function sendMagicLinkEmail(to, token) {
     });
 
     await transporter.sendMail({
-        from: '"LMS Support" <noreply@lms.dev>',
+        from: '"Edura CS" <edura@efrino.web.id>',
         to,
         subject: 'Verify Your Email Address',
         html
@@ -67,7 +68,7 @@ async function sendOtpEmail(to, otp) {
     });
 
     await transporter.sendMail({
-        from: '"LMS MFA" <noreply@lms.dev>',
+        from: '"Edura CS" <edura@efrino.web.id>',
         to,
         subject: 'Your Login OTP Code',
         html
@@ -75,12 +76,12 @@ async function sendOtpEmail(to, otp) {
 }
 
 async function sendPasswordResetLink(to, token) {
-  const link = `${process.env.FRONTEND_BASE_URL}/reset-password?token=${token}`;
+  const link = `${process.env.FRONTEND_BASE_URL}#/reset-password?token=${token}`;
   const html = emailLayout({
     title: 'Reset Your Password',
     body: `
       <p>Hello,</p>
-      <p>Click the button below to reset your LMS account password:</p>
+      <p>Click the button below to reset your Edura account password:</p>
       <div style="text-align: center; margin: 20px 0;">
         <a href="${link}" style="background-color: #e67e22; color: white; padding: 12px 20px; border-radius: 5px; text-decoration: none;">Reset Password</a>
       </div>
@@ -91,9 +92,9 @@ async function sendPasswordResetLink(to, token) {
   });
 
   await transporter.sendMail({
-    from: '"LMS Recovery" <noreply@lms.dev>',
+    from: '"Edura CS" <edura@efrino.web.id>',
     to,
-    subject: 'Reset Your LMS Password',
+    subject: 'Reset Your Edura Password',
     html
   });
 }
