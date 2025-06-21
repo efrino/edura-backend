@@ -3,7 +3,6 @@ const { verifyToken, requireRole } = require('../utils/middleware');
 const { model } = require('../utils/geminiClient');
 const supabase = require('../db');
 
-// Fungsi generate konten per sesi
 async function generateContentForTitle(title) {
     const prompt = `Buatkan konten pembelajaran untuk sesi berjudul "${title}".
 Berikan daftar langkah-langkah atau poin pembelajaran dalam format JSON.
@@ -12,6 +11,7 @@ Contoh format output:
   "overview": "<penjelasan singkat>",
   "steps": ["Langkah 1", "Langkah 2"]
 }`;
+
     try {
         const result = await model.generateContent({
             contents: [{ parts: [{ text: prompt }] }]
@@ -34,48 +34,21 @@ Contoh format output:
     }
 }
 
-// Parsing output dari Gemini
 function parseGeminiOutput(text) {
-    console.log('\n[DEBUG Gemini Output]:\n', text); // 🧪 Cetak output mentah dari Gemini
-
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-
-    let title = null;
-    let description = null;
-
-    // Gabungkan semua baris menjadi satu blok teks
     const fullText = lines.join('\n');
 
-    // Gunakan regex untuk mencari judul dan deskripsi dengan fleksibel
     const titleMatch = fullText.match(/judul\s*[:\-]\s*(.+)/i);
     const descMatch = fullText.match(/deskripsi\s*[:\-]\s*(.+)/i);
 
-    // Ambil hasil atau fallback
-    title = titleMatch?.[1]?.trim() || lines[0]; // Fallback: baris pertama
-    description = descMatch?.[1]?.trim() || lines[1]; // Fallback: baris kedua
+    const title = titleMatch?.[1]?.trim() || lines[0];
+    const description = descMatch?.[1]?.trim() || lines[1];
 
-    // Ambil baris-baris yang merupakan sesi pertemuan (format: 1. Judul)
     const sessionRegex = /^\d+\.\s*(.+)$/gm;
     let match;
     const sessions = [];
     while ((match = sessionRegex.exec(fullText)) !== null && sessions.length < 16) {
-        sessions.push({
-            title: match[1].trim(),
-            content: {} // konten akan digenerate di tempat lain
-        });
-    }
-
-    // Validasi hasil parsing
-    if (!title || !description || sessions.length !== 16) {
-        console.warn('\n[WARNING] Parsing gagal, hasil tidak lengkap:');
-        console.warn('Judul:', title);
-        console.warn('Deskripsi:', description);
-        console.warn('Jumlah sesi:', sessions.length);
-    } else {
-        console.log('\n[INFO] Parsing berhasil:');
-        console.log('Judul:', title);
-        console.log('Deskripsi:', description);
-        console.log('Jumlah sesi:', sessions.length);
+        sessions.push({ title: match[1].trim(), content: {} });
     }
 
     return {
@@ -84,8 +57,6 @@ function parseGeminiOutput(text) {
         sessions
     };
 }
-
-
 
 module.exports = {
     name: 'course-routes',
@@ -100,7 +71,7 @@ module.exports = {
                 pre: [verifyToken, requireRole('student')],
                 validate: {
                     payload: Joi.object({
-                        subject: Joi.string().required().label('Mau belajar apa?'),
+                        subject: Joi.string().required(),
                         level: Joi.string().valid('beginner', 'intermediate', 'expert').required()
                     })
                 }
@@ -121,34 +92,38 @@ module.exports = {
                     .eq('id', userId)
                     .single();
 
-                if (profileError || !profile) {
-                    return h.response({ message: 'Profil student tidak ditemukan' }).code(404);
-                }
-
-                if (userError || !user) {
-                    return h.response({ message: 'User tidak ditemukan' }).code(404);
-                }
+                if (profileError || !profile) return h.response({ message: 'Profil student tidak ditemukan' }).code(404);
+                if (userError || !user) return h.response({ message: 'User tidak ditemukan' }).code(404);
 
                 const programStudi = profile.program_studi;
                 const userPlan = user.plan || 'free';
 
-                if (userPlan === 'free') {
-                    const { count, error: countError } = await supabase
-                        .from('student_courses')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('student_id', userId);
+                const { data: courseCountData, error: courseCountError } = await supabase
+                    .from('student_courses')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('student_id', userId);
 
-                    if (countError) {
-                        console.error('Gagal cek kuota course:', countError);
-                        return h.response({ message: 'Gagal memverifikasi kuota course' }).code(500);
-                    }
+                const courseCount = courseCountData || 0;
+                if (courseCountError) return h.response({ message: 'Gagal cek kuota course' }).code(500);
+                if (userPlan === 'free' && courseCount >= 5) {
+                    return h.response({
+                        message: 'Kamu sudah memiliki 5 course. Upgrade ke akun premium untuk menambah kuota.',
+                        upgrade_required: true
+                    }).code(403);
+                }
 
-                    if (count >= 5) {
-                        return h.response({
-                            message: 'Kamu sudah memiliki 5 course. Upgrade ke akun premium untuk menambah kuota.',
-                            upgrade_required: true
-                        }).code(403);
-                    }
+                const { data: pending, error: pendingError } = await supabase
+                    .from('courses')
+                    .select('id')
+                    .eq('created_by', userId)
+                    .eq('is_generating', true)
+                    .maybeSingle();
+
+                if (pending) {
+                    return h.response({
+                        message: 'Sedang ada course yang sedang digenerate. Silakan tunggu beberapa saat.',
+                        course_id: pending.id
+                    }).code(429);
                 }
 
                 const { data: existingCourse, error: fetchError } = await supabase
@@ -159,17 +134,39 @@ module.exports = {
                     .eq('program_studi', programStudi)
                     .maybeSingle();
 
-                let courseId;
-
-                if (fetchError) {
-                    console.error(fetchError);
-                    return h.response({ message: 'Gagal cek course di database' }).code(500);
-                }
+                if (fetchError) return h.response({ message: 'Gagal cek course di database' }).code(500);
 
                 if (existingCourse) {
-                    courseId = existingCourse.id;
-                } else {
-                    const prompt = `Buatkan course pembelajaran dengan level ${level} untuk program studi ${programStudi}.
+                    const { data: alreadyTaken } = await supabase
+                        .from('student_courses')
+                        .select('id')
+                        .eq('student_id', userId)
+                        .eq('course_id', existingCourse.id)
+                        .maybeSingle();
+
+                    if (!alreadyTaken) {
+                        if (userPlan === 'free' && courseCount >= 5) {
+                            return h.response({
+                                message: 'Batas 5 course plan gratis sudah tercapai. Upgrade ke premium.',
+                                upgrade_required: true
+                            }).code(403);
+                        }
+
+                        const { error: insertError } = await supabase
+                            .from('student_courses')
+                            .insert({ student_id: userId, course_id: existingCourse.id });
+
+                        if (insertError) return h.response({ message: 'Gagal menyimpan ke student_courses' }).code(500);
+                    }
+
+                    return h.response({
+                        message: 'Course sudah tersedia, kamu langsung masuk',
+                        course_id: existingCourse.id,
+                        reused: true
+                    }).code(200);
+                }
+
+                const prompt = `Buatkan course pembelajaran dengan level ${level} untuk program studi ${programStudi}.
 Topik utama course adalah "${subject}". Formatkan output sebagai berikut:
 
 Judul: <judul course>
@@ -181,95 +178,83 @@ Berikut 16 pertemuan:
 ...
 16. <judul pertemuan 16>`;
 
-                    let generated;
+                let generated;
+                try {
+                    const result = await model.generateContent({ contents: [{ parts: [{ text: prompt }] }] });
+                    const response = await result.response;
+                    generated = response.text();
+                } catch (err) {
+                    console.error('Gemini error:', err);
+                    return h.response({ message: 'Sedang banyak permintaan. Coba lagi dalam 1 menit.' }).code(429);
+                }
+
+                const parsed = parseGeminiOutput(generated);
+                if (!parsed.title || parsed.sessions.length !== 16) {
+                    return h.response({
+                        message: 'Output Gemini tidak valid. Harus 16 sesi dan ada judul.'
+                    }).code(400);
+                }
+
+                const { data: course, error: courseError } = await supabase
+                    .from('courses')
+                    .insert({
+                        created_by: userId,
+                        subject,
+                        title: parsed.title,
+                        description: parsed.description,
+                        program_studi: programStudi,
+                        level,
+                        is_verified: false,
+                        is_generating: true
+                    })
+                    .select()
+                    .single();
+
+                if (courseError) return h.response({ message: 'Gagal menyimpan course' }).code(500);
+
+                const courseId = course.id;
+                const sessionsData = [];
+                for (let i = 0; i < parsed.sessions.length; i++) {
+                    const s = parsed.sessions[i];
                     try {
-                        const result = await model.generateContent({
-                            contents: [{ parts: [{ text: prompt }] }]
+                        const contentObj = await generateContentForTitle(s.title);
+                        sessionsData.push({
+                            course_id: courseId,
+                            session_number: i + 1,
+                            title: s.title || `Pertemuan ${i + 1}`,
+                            content: JSON.stringify(contentObj)
                         });
-                        const response = await result.response;
-                        generated = response.text();
                     } catch (err) {
-                        console.error('Gemini error:', err);
-                        return h.response({ message: 'Gagal generate course dari Gemini' }).code(500);
-                    }
-
-                    const parsed = parseGeminiOutput(generated);
-                    if (!parsed.title || parsed.sessions.length !== 16) {
-                        console.warn('Gemini output:\n', generated);
-                        return h.response({
-                            message: 'Output Gemini tidak valid. Pastikan subject dan level spesifik.',
-                            error: 'Parsing gagal: jumlah sesi harus 16 dan harus ada judul.'
-                        }).code(400);
-                    }
-
-                    for (let i = 0; i < parsed.sessions.length; i++) {
-                        const contentObj = await generateContentForTitle(parsed.sessions[i].title);
-                        parsed.sessions[i].content = JSON.stringify(contentObj);
-                    }
-
-                    const { data: course, error: courseError } = await supabase
-                        .from('courses')
-                        .insert({
-                            created_by: userId,
-                            subject,
-                            title: parsed.title,
-                            description: parsed.description,
-                            program_studi: programStudi,
-                            level,
-                            is_verified: false
-                        })
-                        .select()
-                        .single();
-
-                    if (courseError) {
-                        console.error(courseError);
-                        return h.response({ message: 'Gagal menyimpan course' }).code(500);
-                    }
-
-                    courseId = course.id;
-
-                    const sessionsData = parsed.sessions.map((s, i) => ({
-                        course_id: courseId,
-                        session_number: i + 1,
-                        title: s.title,
-                        content: s.content
-                    }));
-
-                    const { error: sessionsError } = await supabase
-                        .from('course_sessions')
-                        .insert(sessionsData);
-
-                    if (sessionsError) {
-                        console.error(sessionsError);
-                        return h.response({ message: 'Course berhasil dibuat, tapi gagal simpan sesi' }).code(500);
+                        console.error('Gagal generate sesi:', s.title);
+                        await supabase.from('courses').delete().eq('id', courseId);
+                        return h.response({ message: 'Gagal generate sesi. Course dibatalkan.' }).code(500);
                     }
                 }
 
-                const { data: checkStudentCourse } = await supabase
+                const { error: sessionError } = await supabase
+                    .from('course_sessions')
+                    .insert(sessionsData);
+
+                if (sessionError) {
+                    await supabase.from('courses').delete().eq('id', courseId);
+                    return h.response({ message: 'Course gagal disimpan. Course dibatalkan.' }).code(500);
+                }
+
+                await supabase.from('courses')
+                    .update({ is_generating: false })
+                    .eq('id', courseId);
+
+                const { error: scError } = await supabase
                     .from('student_courses')
-                    .select('id')
-                    .eq('student_id', userId)
-                    .eq('course_id', courseId)
-                    .maybeSingle();
+                    .insert({ student_id: userId, course_id: courseId });
 
-                if (!checkStudentCourse) {
-                    const { error: scError } = await supabase
-                        .from('student_courses')
-                        .insert({ student_id: userId, course_id: courseId });
-
-                    if (scError) {
-                        console.error(scError);
-                        return h.response({ message: 'Gagal menyimpan ke student_courses' }).code(500);
-                    }
-                }
+                if (scError) return h.response({ message: 'Gagal menambahkan course ke akun.' }).code(500);
 
                 return h.response({
-                    message: existingCourse
-                        ? 'Course sudah tersedia, kamu langsung masuk'
-                        : 'Course berhasil dibuat dan ditambahkan ke akunmu',
+                    message: 'Course berhasil dibuat dan ditambahkan ke akunmu',
                     course_id: courseId,
-                    reused: !!existingCourse
-                }).code(existingCourse ? 200 : 201);
+                    reused: false
+                }).code(201);
             }
         });
     }

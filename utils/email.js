@@ -1,14 +1,13 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Setup transporter untuk Mailtrap
 const transporter = nodemailer.createTransport({
-    host: process.env.MAILTRAP_HOST,
-    port: process.env.MAILTRAP_PORT,
-    secure: process.env.MAILTRAP_SECURE === 'true',
+    host: process.env.MAIL_HOST,
+    port: process.env.MAIL_PORT,
+    secure: process.env.MAIL_SECURE === 'true',
     auth: {
-        user: process.env.MAILTRAP_USER,
-        pass: process.env.MAILTRAP_PASS
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS
     }
 });
 

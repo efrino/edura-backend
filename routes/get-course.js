@@ -10,13 +10,13 @@ module.exports = {
             path: '/student/course/recommendations',
             options: {
                 tags: ['api', 'Course'],
-                description: 'Get recommended course titles for student by program studi (yang belum pernah diambil)',
+                description: 'Get recommended course subjects and levels not yet taken (with is_verified info)',
                 pre: [verifyToken, requireRole('student')]
             },
             handler: async (request, h) => {
                 const userId = request.auth.credentials.id;
 
-                // 1. Ambil profil student (program studi)
+                // 1. Ambil program studi student
                 const { data: profile, error: profileError } = await supabase
                     .from('student_profiles')
                     .select('program_studi')
@@ -29,7 +29,7 @@ module.exports = {
 
                 const programStudi = profile.program_studi;
 
-                // 2. Ambil plan user dari tabel users
+                // 2. Ambil plan user
                 const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('plan')
@@ -63,15 +63,14 @@ module.exports = {
                     }).code(403);
                 }
 
-                // 4. Ambil course sesuai program studi yang belum diambil
+                // 4. Ambil semua course yang belum diambil (tanpa filter is_verified)
                 let query = supabase
                     .from('courses')
-                    .select('id, title, is_verified')
+                    .select('id, subject, level, is_verified')
                     .eq('program_studi', programStudi);
 
                 if (takenIds.length > 0) {
-                    const idList = `(${takenIds.join(',')})`; // Supabase expects string format for .in/.not.in
-                    query = query.not('id', 'in', idList);
+                    query = query.not('id', 'in', `(${takenIds.join(',')})`);
                 }
 
                 const { data: courses, error: courseError } = await query;
@@ -83,20 +82,31 @@ module.exports = {
 
                 if (!courses || courses.length === 0) {
                     return h.response({
-                        message: 'Tidak ada course baru yang tersedia. Anda telah mengambil semua course di program studi ini.'
+                        message: 'Tidak ada course baru yang tersedia.',
+                        recommendations: []
                     }).code(200);
                 }
 
-                const titles = courses.map(c => ({
-                    id: c.id,
-                    title: c.title,
-                    is_verified: c.is_verified
-                }));
+                // 5. Buat daftar subject+level unik
+                const seen = new Set();
+                const uniqueRecommendations = [];
+
+                for (const course of courses) {
+                    const key = `${course.subject?.toLowerCase()}-${course.level}`;
+                    if (!seen.has(key)) {
+                        uniqueRecommendations.push({
+                            subject: course.subject,
+                            level: course.level,
+                            is_verified: course.is_verified
+                        });
+                        seen.add(key);
+                    }
+                }
 
                 return h.response({
-                    message: 'Rekomendasi course ditemukan',
-                    titles
-                });
+                    message: 'Berikut course yang direkomendasikan untuk Anda',
+                    recommendations: uniqueRecommendations
+                }).code(200);
             }
         });
     }
