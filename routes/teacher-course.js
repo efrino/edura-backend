@@ -421,6 +421,40 @@ module.exports = {
                         sessions
                     };
                 }
+            },
+            // ✅ GET /teacher/courses/verified
+            {
+                method: 'GET',
+                path: '/teacher/courses/verified',
+                options: {
+                    tags: ['api', 'Course'],
+                    description: 'List all verified courses in teacher\'s program studi',
+                    pre: [verifyToken, requireRole('teacher')],
+                },
+                handler: async (req, h) => {
+                    const userId = req.auth.credentials.id;
+
+                    // Ambil teacher profile
+                    const { data: teacher, error } = await db
+                        .from('teacher_profiles')
+                        .select('full_name, program_studi')
+                        .eq('user_id', userId)
+                        .maybeSingle();
+
+                    if (error || !teacher) {
+                        return h.response({ message: 'Profil teacher tidak ditemukan' }).code(404);
+                    }
+
+                    const { data: courses, error: courseErr } = await db
+                        .from('courses')
+                        .select('*')
+                        .eq('program_studi', teacher.program_studi)
+                        .eq('is_verified', true);
+
+                    if (courseErr) throw courseErr;
+                    return courses;
+                }
+
             }
 
         ]);
