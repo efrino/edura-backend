@@ -18,36 +18,120 @@ module.exports = {
             handler: async (request, h) => {
                 const studentId = request.auth.credentials.id;
 
-                const { data, error } = await supabase
+                // Step 1: Get enrolled courses
+                const { data: enrolledCourses, error: enrolledError } = await supabase
                     .from('student_courses')
                     .select(`
-            course_id,
-            checkpoint,
-            is_completed,
-            courses (
-              title,
-              level,
-              course_sessions(count)
-            )
-          `)
+                course_id,
+                checkpoint,
+                is_completed,
+                courses (
+                    id,
+                    title,
+                    level,
+                    subject,
+                    program_studi,
+                    is_verified,
+                    verified_by
+                )
+            `)
                     .eq('student_id', studentId);
 
-                if (error) {
-                    console.error(error);
+                if (enrolledError) {
+                    console.error(enrolledError);
                     return h.response({ message: 'Gagal mengambil data course' }).code(500);
                 }
 
-                const result = data.map(item => ({
-                    course_id: item.course_id,
-                    title: item.courses.title,
-                    level: item.courses.level,
-                    checkpoint: item.checkpoint,
-                    is_completed: item.is_completed,
-                    total_sessions: item.courses.course_sessions.length,
-                }));
+                // Step 2: Ambil semua kombinasi unik untuk filter
+                const uniqueFilters = Array.from(
+                    new Set(
+                        enrolledCourses.map(ec => JSON.stringify({
+                            subject: ec.courses.subject,
+                            level: ec.courses.level,
+                            program_studi: ec.courses.program_studi
+                        }))
+                    )
+                ).map(f => JSON.parse(f));
 
-                return h.response(result).code(200);
-            },
+                let allCourses = [];
+
+                // Step 3: Ambil semua courses yang cocok
+                for (const filter of uniqueFilters) {
+                    const { data: matchedCourses, error } = await supabase
+                        .from('courses')
+                        .select(`
+                    id,
+                    title,
+                    level,
+                    subject,
+                    program_studi,
+                    is_verified,
+                    verified_by
+                `)
+                        .eq('subject', filter.subject)
+                        .eq('level', filter.level)
+                        .eq('program_studi', filter.program_studi)
+                        .eq('is_verified', true);
+
+                    if (error) {
+                        console.error(error);
+                        continue;
+                    }
+
+                    allCourses.push(...matchedCourses);
+                }
+
+                // Step 4: Ambil jumlah sesi dari semua course
+                const courseIds = allCourses.map(course => course.id);
+                const { data: sessions, error: sessionsError } = await supabase
+                    .from('course_sessions')
+                    .select('course_id')
+                    .in('course_id', courseIds);
+
+                if (sessionsError) {
+                    console.error(sessionsError);
+                    return h.response({ message: 'Gagal mengambil sesi course' }).code(500);
+                }
+
+                // Hitung total sesi per course
+                const sessionCounts = {};
+                for (const s of sessions) {
+                    sessionCounts[s.course_id] = (sessionCounts[s.course_id] || 0) + 1;
+                }
+
+                const enrolledMap = {};
+                for (const ec of enrolledCourses) {
+                    enrolledMap[ec.course_id] = ec;
+                }
+
+                // Step 5: Gabungkan semua data
+                const results = allCourses.map(course => {
+                    const enrolled = enrolledMap[course.id];
+                    const totalSessions = sessionCounts[course.id] || 0;
+
+                    const checkpoint = enrolled?.checkpoint ?? 0;
+                    const percentage = totalSessions > 0
+                        ? Math.round((checkpoint / totalSessions) * 100)
+                        : 0;
+
+                    return {
+                        course_id: course.id,
+                        title: course.title,
+                        level: course.level,
+                        subject: course.subject,
+                        program_studi: course.program_studi,
+                        is_verified: course.is_verified || false,
+                        verified_by: course.verified_by || null,
+                        is_enrolled: !!enrolled,
+                        checkpoint,
+                        is_completed: enrolled?.is_completed ?? false,
+                        total_sessions: totalSessions,
+                        percentage
+                    };
+                });
+
+                return h.response(results).code(200);
+            }
         });
 
         // === PUT /student/courses/{courseId}/checkpoint ===
