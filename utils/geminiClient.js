@@ -19,7 +19,7 @@ function getNextModel() {
     currentIndex = (currentIndex + 1) % keys.length;
 
     const genAI = new GoogleGenerativeAI(key);
-    return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    return genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 }
 
 module.exports = { getNextModel };

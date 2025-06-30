@@ -1,10 +1,11 @@
-// === routes/create-course.js ===
 const Joi = require('joi');
 const { verifyToken, requireRole } = require('../utils/middleware');
 const { generateContentForTitle } = require('../utils/generate-content');
 const { getNextModel } = require('../utils/geminiClient');
 const { logActivity } = require('../utils/logger');
 const supabase = require('../db');
+const stringSimilarity = require('string-similarity');
+const { normalizeSubject } = require('../utils/normalize');
 
 function parseGeminiOutput(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -90,33 +91,54 @@ module.exports = {
                     .maybeSingle();
                 if (pending) return h.response({ message: 'Course sedang digenerate.', course_id: pending.id }).code(429);
 
-                const { data: existingCourse } = await supabase
+                // === Normalisasi & cek kemiripan subject ===
+                const normalizedInput = normalizeSubject(subject);
+
+                const { data: similarCourses } = await supabase
                     .from('courses')
-                    .select('id')
-                    .eq('subject', subject)
-                    .eq('level', level)
+                    .select('id, subject')
                     .eq('program_studi', programStudi)
-                    .maybeSingle();
+                    .eq('level', level);
 
-                if (existingCourse) {
-                    const { data: taken } = await supabase
-                        .from('student_courses')
-                        .select('id')
-                        .eq('student_id', userId)
-                        .eq('course_id', existingCourse.id)
-                        .maybeSingle();
+                if (similarCourses && similarCourses.length > 0) {
+                    const matches = similarCourses.map(course => {
+                        return {
+                            id: course.id,
+                            subject: course.subject,
+                            similarity: stringSimilarity.compareTwoStrings(
+                                normalizeSubject(course.subject),
+                                normalizedInput
+                            )
+                        };
+                    });
 
-                    if (!taken) {
-                        await supabase.from('student_courses').insert({ student_id: userId, course_id: existingCourse.id });
+                    matches.sort((a, b) => b.similarity - a.similarity);
+
+                    if (matches[0].similarity >= 0.75) {
+                        const reusedCourse = matches[0];
+                        const { data: taken } = await supabase
+                            .from('student_courses')
+                            .select('id')
+                            .eq('student_id', userId)
+                            .eq('course_id', reusedCourse.id)
+                            .maybeSingle();
+
+                        if (!taken) {
+                            await supabase.from('student_courses').insert({
+                                student_id: userId,
+                                course_id: reusedCourse.id
+                            });
+                        }
+
+                        return h.response({
+                            message: `Course dengan topik serupa "${reusedCourse.subject}" sudah tersedia, kamu langsung masuk.`,
+                            course_id: reusedCourse.id,
+                            reused: true
+                        }).code(200);
                     }
-
-                    return h.response({
-                        message: 'Course sudah tersedia, kamu langsung masuk',
-                        course_id: existingCourse.id,
-                        reused: true
-                    }).code(200);
                 }
 
+                // === GENERATE COURSE BARU ===
                 const prompt = `Buatkan course pembelajaran dengan level ${level} untuk program studi ${programStudi}.
 Topik utama course adalah "${subject}". Formatkan output sebagai berikut:
 
@@ -132,7 +154,7 @@ Berikut 16 pertemuan:
                 let success = false;
                 let lastError;
 
-                for (let i = 0; i < 3; i++) {
+                for (let i = 0; i < 4; i++) {
                     try {
                         const model = getNextModel();
                         const result = await model.generateContent({ contents: [{ parts: [{ text: prompt }] }] });
@@ -154,7 +176,6 @@ Berikut 16 pertemuan:
                 if (!parsed.title || parsed.sessions.length !== 16) {
                     return h.response({ message: 'Output Gemini tidak valid. Harus ada 16 sesi dan judul.' }).code(400);
                 }
-
                 const { data: course, error: courseError } = await supabase
                     .from('courses')
                     .insert({
@@ -171,6 +192,20 @@ Berikut 16 pertemuan:
                     .single();
 
                 if (courseError) return h.response({ message: 'Gagal menyimpan course' }).code(500);
+
+                // Langsung tambahkan ke student_courses meskipun masih generating
+                const { error: insertStudentCourseError } = await supabase
+                    .from('student_courses')
+                    .insert({
+                        student_id: userId,
+                        course_id: course.id
+                    });
+
+                if (insertStudentCourseError) {
+                    await supabase.from('courses').delete().eq('id', course.id);
+                    return h.response({ message: 'Gagal menyimpan progress student' }).code(500);
+                }
+
 
                 const sessionsData = [];
                 for (let i = 0; i < parsed.sessions.length; i++) {
@@ -201,7 +236,20 @@ Berikut 16 pertemuan:
                 }
 
                 await supabase.from('courses').update({ is_generating: false }).eq('id', course.id);
-                await supabase.from('student_courses').insert({ student_id: userId, course_id: course.id });
+                const { data: alreadyJoined } = await supabase
+                    .from('student_courses')
+                    .select('id')
+                    .eq('student_id', userId)
+                    .eq('course_id', course.id)
+                    .maybeSingle();
+
+                if (!alreadyJoined) {
+                    await supabase.from('student_courses').insert({
+                        student_id: userId,
+                        course_id: course.id
+                    });
+                }
+
 
                 logActivity('COURSE_SUCCESS', `Course created: ${course.id}`);
 

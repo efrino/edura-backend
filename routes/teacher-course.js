@@ -75,7 +75,7 @@ module.exports = {
                 path: '/teacher/courses/{id}/sessions/{sessionNumber}',
                 options: {
                     tags: ['api', 'Course'],
-                    description: 'Edit session title & content before verification',
+                    description: 'Edit session title & content (Gemini format text) before verification',
                     pre: [verifyToken, requireRole('teacher')],
                     validate: {
                         params: Joi.object({
@@ -84,10 +84,7 @@ module.exports = {
                         }),
                         payload: Joi.object({
                             title: Joi.string().required(),
-                            content: Joi.object({
-                                overview: Joi.string().required(),
-                                steps: Joi.array().items(Joi.string()).required()
-                            }).required()
+                            content: Joi.string().required() // ← plain Gemini-format text
                         })
                     }
                 },
@@ -128,7 +125,7 @@ module.exports = {
                         .from('course_sessions')
                         .update({
                             title,
-                            content: JSON.stringify(content)
+                            content // ← langsung simpan sebagai teks biasa
                         })
                         .eq('course_id', courseId)
                         .eq('session_number', sessionNumber);
@@ -137,24 +134,22 @@ module.exports = {
 
                     return { message: `Sesi ${sessionNumber} berhasil diupdate` };
                 }
-            }
-            ,
+            } ,
             // ✅ GET /teacher/courses/unverified
             {
                 method: 'GET',
                 path: '/teacher/courses/unverified',
                 options: {
                     tags: ['api', 'Course'],
-                    description: 'List all unverified courses in teacher\'s program studi',
+                    description: 'List unverified courses in teacher\'s program studi with student count only',
                     pre: [verifyToken, requireRole('teacher')],
                 },
                 handler: async (req, h) => {
                     const userId = req.auth.credentials.id;
 
-                    // Ambil teacher profile
                     const { data: teacher, error } = await db
                         .from('teacher_profiles')
-                        .select('full_name, program_studi')
+                        .select('program_studi')
                         .eq('user_id', userId)
                         .maybeSingle();
 
@@ -164,12 +159,89 @@ module.exports = {
 
                     const { data: courses, error: courseErr } = await db
                         .from('courses')
-                        .select('*')
+                        .select(`
+                id,
+                title,
+                description,
+                level,
+                subject,
+                program_studi,
+                is_verified,
+                student_courses(count)
+            `)
                         .eq('program_studi', teacher.program_studi)
                         .eq('is_verified', false);
 
                     if (courseErr) throw courseErr;
-                    return courses;
+
+                    const withCounts = courses.map(course => ({
+                        id: course.id,
+                        title: course.title,
+                        description: course.description,
+                        level: course.level,
+                        subject: course.subject,
+                        program_studi: course.program_studi,
+                        is_verified: course.is_verified,
+                        student_count: course.student_courses?.[0]?.count || 0
+                    }));
+
+                    return h.response(withCounts).code(200);
+                }
+            }
+            ,
+            // ✅ GET /teacher/courses/verified
+            {
+                method: 'GET',
+                path: '/teacher/courses/verified',
+                options: {
+                    tags: ['api', 'Course'],
+                    description: 'List verified courses in teacher\'s program studi with student count only',
+                    pre: [verifyToken, requireRole('teacher')],
+                },
+                handler: async (req, h) => {
+                    const userId = req.auth.credentials.id;
+
+                    const { data: teacher, error } = await db
+                        .from('teacher_profiles')
+                        .select('program_studi')
+                        .eq('user_id', userId)
+                        .maybeSingle();
+
+                    if (error || !teacher) {
+                        return h.response({ message: 'Profil teacher tidak ditemukan' }).code(404);
+                    }
+
+                    const { data: courses, error: courseErr } = await db
+                        .from('courses')
+                        .select(`
+                id,
+                title,
+                description,
+                level,
+                subject,
+                program_studi,
+                is_verified,
+                verified_by,
+                student_courses(count)
+            `)
+                        .eq('program_studi', teacher.program_studi)
+                        .eq('is_verified', true);
+
+                    if (courseErr) throw courseErr;
+
+                    const withCounts = courses.map(course => ({
+                        id: course.id,
+                        title: course.title,
+                        description: course.description,
+                        level: course.level,
+                        subject: course.subject,
+                        program_studi: course.program_studi,
+                        is_verified: course.is_verified,
+                        verified_by: course.verified_by,
+                        student_count: course.student_courses?.[0]?.count || 0
+                    }));
+
+                    return h.response(withCounts).code(200);
                 }
             },
 
@@ -422,40 +494,7 @@ module.exports = {
                     };
                 }
             },
-            // ✅ GET /teacher/courses/verified
-            {
-                method: 'GET',
-                path: '/teacher/courses/verified',
-                options: {
-                    tags: ['api', 'Course'],
-                    description: 'List all verified courses in teacher\'s program studi',
-                    pre: [verifyToken, requireRole('teacher')],
-                },
-                handler: async (req, h) => {
-                    const userId = req.auth.credentials.id;
 
-                    // Ambil teacher profile
-                    const { data: teacher, error } = await db
-                        .from('teacher_profiles')
-                        .select('full_name, program_studi')
-                        .eq('user_id', userId)
-                        .maybeSingle();
-
-                    if (error || !teacher) {
-                        return h.response({ message: 'Profil teacher tidak ditemukan' }).code(404);
-                    }
-
-                    const { data: courses, error: courseErr } = await db
-                        .from('courses')
-                        .select('*')
-                        .eq('program_studi', teacher.program_studi)
-                        .eq('is_verified', true);
-
-                    if (courseErr) throw courseErr;
-                    return courses;
-                }
-
-            }
 
         ]);
     }
