@@ -134,19 +134,20 @@ module.exports = {
 
                     return { message: `Sesi ${sessionNumber} berhasil diupdate` };
                 }
-            } ,
+            },
             // ✅ GET /teacher/courses/unverified
             {
                 method: 'GET',
                 path: '/teacher/courses/unverified',
                 options: {
                     tags: ['api', 'Course'],
-                    description: 'List unverified courses in teacher\'s program studi with student count only',
+                    description: 'List unverified courses dengan batas class student = teacher class',
                     pre: [verifyToken, requireRole('teacher')],
                 },
                 handler: async (req, h) => {
                     const userId = req.auth.credentials.id;
 
+                    // Ambil program studi & kelas milik teacher
                     const { data: teacher, error } = await db
                         .from('teacher_profiles')
                         .select('program_studi')
@@ -157,35 +158,29 @@ module.exports = {
                         return h.response({ message: 'Profil teacher tidak ditemukan' }).code(404);
                     }
 
+                    // Ambil semua class_id yang diajar oleh teacher dari tabel classes
+                    const { data: teacherClasses, error: classErr } = await db
+                        .from('classes')
+                        .select('id')
+                        .eq('teacher_id', userId);
+
+                    if (classErr) throw classErr;
+
+                    const classIds = teacherClasses.map((cls) => cls.id);
+                    if (classIds.length === 0) {
+                        return h.response([]).code(200); // teacher belum punya kelas
+                    }
+
+                    // Ambil course yang belum diverifikasi dan student-nya berasal dari kelas teacher
                     const { data: courses, error: courseErr } = await db
-                        .from('courses')
-                        .select(`
-                id,
-                title,
-                description,
-                level,
-                subject,
-                program_studi,
-                is_verified,
-                student_courses(count)
-            `)
-                        .eq('program_studi', teacher.program_studi)
-                        .eq('is_verified', false);
+                        .rpc('get_unverified_courses_by_teacher_classes', {
+                            program_studi_input: teacher.program_studi,
+                            class_ids_input: classIds
+                        });
 
                     if (courseErr) throw courseErr;
 
-                    const withCounts = courses.map(course => ({
-                        id: course.id,
-                        title: course.title,
-                        description: course.description,
-                        level: course.level,
-                        subject: course.subject,
-                        program_studi: course.program_studi,
-                        is_verified: course.is_verified,
-                        student_count: course.student_courses?.[0]?.count || 0
-                    }));
-
-                    return h.response(withCounts).code(200);
+                    return h.response(courses).code(200);
                 }
             }
             ,
@@ -195,7 +190,7 @@ module.exports = {
                 path: '/teacher/courses/verified',
                 options: {
                     tags: ['api', 'Course'],
-                    description: 'List verified courses in teacher\'s program studi with student count only',
+                    description: 'List verified courses in teacher\'s program studi with student count only (filtered by class)',
                     pre: [verifyToken, requireRole('teacher')],
                 },
                 handler: async (req, h) => {
@@ -211,40 +206,30 @@ module.exports = {
                         return h.response({ message: 'Profil teacher tidak ditemukan' }).code(404);
                     }
 
+                    const { data: teacherClasses, error: classErr } = await db
+                        .from('classes')
+                        .select('id')
+                        .eq('teacher_id', userId);
+
+                    if (classErr) throw classErr;
+
+                    const classIds = teacherClasses.map((cls) => cls.id);
+                    if (classIds.length === 0) {
+                        return h.response([]).code(200);
+                    }
+
                     const { data: courses, error: courseErr } = await db
-                        .from('courses')
-                        .select(`
-                id,
-                title,
-                description,
-                level,
-                subject,
-                program_studi,
-                is_verified,
-                verified_by,
-                student_courses(count)
-            `)
-                        .eq('program_studi', teacher.program_studi)
-                        .eq('is_verified', true);
+                        .rpc('get_verified_courses_by_teacher_classes', {
+                            program_studi_input: teacher.program_studi,
+                            class_ids_input: classIds
+                        });
 
                     if (courseErr) throw courseErr;
 
-                    const withCounts = courses.map(course => ({
-                        id: course.id,
-                        title: course.title,
-                        description: course.description,
-                        level: course.level,
-                        subject: course.subject,
-                        program_studi: course.program_studi,
-                        is_verified: course.is_verified,
-                        verified_by: course.verified_by,
-                        student_count: course.student_courses?.[0]?.count || 0
-                    }));
-
-                    return h.response(withCounts).code(200);
+                    return h.response(courses).code(200);
                 }
-            },
-
+            }
+            ,
             // ✅ PUT /teacher/courses/{id}/verify
             {
                 method: 'PUT',

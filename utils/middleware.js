@@ -16,7 +16,7 @@ async function verifyToken(request, h) {
     throw Boom.unauthorized('Invalid or expired token');
   }
 
-  // Ambil data lengkap user dari Supabase
+  // Ambil user dasar
   const { data: user, error } = await supabase
     .from('users')
     .select('id, email, full_name, role, plan, plan_expires_at')
@@ -27,27 +27,49 @@ async function verifyToken(request, h) {
     throw Boom.unauthorized('User not found');
   }
 
-  // Cek apakah plan premium sudah expired
+  // Cek expired plan
   if (user.plan === 'premium' && user.plan_expires_at) {
     const now = new Date();
     const expires = new Date(user.plan_expires_at);
 
     if (expires < now) {
-      // Auto downgrade ke free
       await supabase.from('users')
         .update({ plan: 'free', plan_expires_at: null })
         .eq('id', user.id);
-
       user.plan = 'free';
       user.plan_expires_at = null;
     }
   }
 
-  // Inject data user ke request.auth.credentials
+  // Jika role teacher, ambil daftar class_id yang dia pegang
+  if (user.role === 'teacher') {
+    const { data: teacherClassData, error: classErr } = await supabase
+      .from('teacher_classes')
+      .select('class_id')
+      .eq('teacher_id', user.id);
+
+    if (!classErr && teacherClassData) {
+      user.class_ids = teacherClassData.map((c) => c.class_id); // simpan array class_id
+    } else {
+      user.class_ids = [];
+    }
+
+    // Ambil juga program_studi dari profil
+    const { data: teacherProfile } = await supabase
+      .from('teacher_profiles')
+      .select('program_studi')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (teacherProfile) {
+      user.program_studi = teacherProfile.program_studi;
+    }
+  }
+
+  // Inject
   request.auth = { credentials: user };
   return h.continue;
 }
-
 // Role-based access control
 function requireRole(...allowedRoles) {
   return (request, h) => {

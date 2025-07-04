@@ -82,32 +82,34 @@ module.exports = {
             options: {
                 auth: false,
                 tags: ['api', 'Payment'],
-                description: 'Webhook dari Midtrans untuk update plan',
+                description: 'Webhook dari Midtrans untuk update plan dan log pembayaran',
             },
             handler: async (request, h) => {
                 const body = request.payload;
                 const orderId = body.order_id;
                 const status = body.transaction_status;
 
-                if (!orderId) return h.response({ message: 'order_id tidak valid' }).code(400);
+                if (!orderId) {
+                    return h.response({ message: 'order_id tidak valid' }).code(400);
+                }
 
                 const { data: log, error: logErr } = await supabase
                     .from('payment_logs')
                     .select('user_id')
                     .eq('order_id', orderId)
-                    .single();
+                    .maybeSingle();
 
                 if (logErr || !log) {
-                    console.error('Log tidak ditemukan untuk order:', orderId);
-                    return h.response().code(400);
+                    console.error('❌ Log tidak ditemukan untuk order:', orderId);
+                    return h.response().code(200); // tetap 200 agar Midtrans tidak retry terus
                 }
 
                 const userId = log.user_id;
 
-                // UPGRADE PLAN jika status sukses (settlement atau capture)
+                // === Upgrade plan jika transaksi berhasil
                 if (['settlement', 'capture'].includes(status)) {
                     const expiredAt = new Date();
-                    expiredAt.setMonth(expiredAt.getMonth() + 1); // +1 bulan
+                    expiredAt.setMonth(expiredAt.getMonth() + 1);
 
                     const { error: updateErr } = await supabase
                         .from('users')
@@ -120,19 +122,36 @@ module.exports = {
                     if (updateErr) {
                         console.error('❌ Gagal update plan user:', updateErr);
                     } else {
-                        console.log('✅ Berhasil update plan ke premium untuk user:', userId);
+                        console.log('✅ Plan premium berhasil diperpanjang untuk user:', userId);
                     }
                 }
 
-                // Simpan status terbaru
+                // === Simpan data tambahan dari Midtrans
+                const updateData = {
+                    status: status,
+                    transaction_status: status,
+                    payment_type: body.payment_type || null,
+                    transaction_time: body.transaction_time || null,
+                    settlement_time: body.settlement_time || null,
+                    bank: body.bank || null,
+                    card_type: body.card_type || null,
+                    fraud_status: body.fraud_status || null,
+                    currency: body.currency || null,
+                    masked_card: body.masked_card || null,
+                    channel_response_code: body.channel_response_code || null,
+                    channel_response_message: body.channel_response_message || null,
+                    approval_code: body.approval_code || null,
+                };
+
                 await supabase
                     .from('payment_logs')
-                    .update({ status })
+                    .update(updateData)
                     .eq('order_id', orderId);
 
                 return h.response({ message: 'Webhook diterima' }).code(200);
-            }
+            },
         });
+
         // profile
         server.route({
             method: 'GET',

@@ -75,10 +75,10 @@ async function sendOtpEmail(to, otp) {
 }
 
 async function sendPasswordResetLink(to, token) {
-  const link = `${process.env.FRONTEND_BASE_URL}#/reset-password?token=${token}`;
-  const html = emailLayout({
-    title: 'Reset Your Password',
-    body: `
+    const link = `${process.env.FRONTEND_BASE_URL}#/reset-password?token=${token}`;
+    const html = emailLayout({
+        title: 'Reset Your Password',
+        body: `
       <p>Hello,</p>
       <p>Click the button below to reset your Edura account password:</p>
       <div style="text-align: center; margin: 20px 0;">
@@ -88,18 +88,37 @@ async function sendPasswordResetLink(to, token) {
       <code style="background-color: #f0f0f0; padding: 8px; display: block; word-break: break-all;">${link}</code>
       <p>This link will expire in <strong>1 hour</strong>.</p>
     `
-  });
+    });
 
-  await transporter.sendMail({
-    from: '"Edura CS" <edura@efrino.web.id>',
-    to,
-    subject: 'Reset Your Edura Password',
-    html
-  });
+    await transporter.sendMail({
+        from: '"Edura CS" <edura@efrino.web.id>',
+        to,
+        subject: 'Reset Your Edura Password',
+        html
+    });
+}
+// 📢 Notifikasi dari Teacher ke Student
+async function sendStudentNotification(to, { studentName, message }) {
+    const html = emailLayout({
+        title: 'Progress Reminder from Your Teacher',
+        body: `
+      <p>Dear <strong>${studentName}</strong>,</p>
+      <p>${message}</p>
+      <p>Please check your progress in <a href="${process.env.FRONTEND_BASE_URL}">Edura LMS</a>.</p>
+    `
+    });
+
+    await transporter.sendMail({
+        from: '"Edura CS" <edura@efrino.web.id>',
+        to,
+        subject: 'Reminder from Your Teacher',
+        html
+    });
 }
 
 module.exports = {
     sendMagicLinkEmail,
     sendOtpEmail,
-    sendPasswordResetLink
+    sendPasswordResetLink,
+    sendStudentNotification
 };
