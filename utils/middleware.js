@@ -67,7 +67,10 @@ async function verifyToken(request, h) {
   }
 
   // Inject
-  request.auth = { credentials: user };
+  request.auth = {
+    isAuthenticated: true,
+    credentials: user
+  };
   return h.continue;
 }
 // Role-based access control

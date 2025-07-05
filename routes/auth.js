@@ -394,7 +394,7 @@ module.exports = {
                                 role: user.role
                             },
                             process.env.JWT_SECRET,
-                            { expiresIn: '10000000000000000h' } // expired dalam 1 jam
+                            { expiresIn: '7d' } // expired dalam 1 jam
                         );
 
                         return {

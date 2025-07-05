@@ -1,69 +1,103 @@
+// server.js
+
+require('dotenv').config();
 const Hapi = require('@hapi/hapi');
 const Inert = require('@hapi/inert');
 const Vision = require('@hapi/vision');
 const HapiSwagger = require('hapi-swagger');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+
 const { verifyToken } = require('./utils/middleware');
+const { logActivity } = require('./utils/activity-logger');
 
-
-const init = async () => {
-    // Render will provide PORT automatically via environment variable
-    const port = process.env.PORT || 10000;
-
+async function createServer() {
     const server = Hapi.server({
-        port: port,
-        host: '0.0.0.0', // Required by Render for public HTTP binding
+        port: process.env.PORT || 10000,
+        host: '0.0.0.0',
         routes: {
             cors: {
-                origin: ['*'], // Optional: allows requests from any origin
+                origin: ['*'],
             },
         },
     });
 
-    const swaggerOptions = {
-        info: {
-            title: '📘 LMS Auth API',
-            version: '1.0.0',
-        },
-        documentationPath: '/',
-        grouping: 'tags',
-    };
-
+    // 📘 Swagger documentation
     await server.register([
         Inert,
         Vision,
-        { plugin: HapiSwagger, options: swaggerOptions },
-    ]);
-    server.auth.scheme('custom-jwt', function () {
-        return {
-            authenticate: async function (request, h) {
-                await verifyToken(request, h); // inject ke request.auth
-                return h.authenticated({ credentials: request.auth.credentials });
+        {
+            plugin: HapiSwagger,
+            options: {
+                info: {
+                    title: '📘 LMS API',
+                    version: '1.0.0',
+                },
+                documentationPath: '/',
+                grouping: 'tags',
             },
-        };
-    });
+        },
+    ]);
+
+    // 🔐 Custom JWT auth scheme
+    server.auth.scheme('custom-jwt', () => ({
+        authenticate: async (request, h) => {
+            await verifyToken(request, h);
+            return h.authenticated({ credentials: request.auth.credentials });
+        },
+    }));
 
     server.auth.strategy('jwt', 'custom-jwt');
-    // Auto-load all route plugins from the /routes folder
-    const routeFiles = fs.readdirSync(path.join(__dirname, 'routes'))
-        .filter(f => f.endsWith('.js'));
+    server.auth.default('jwt'); // ✅ All routes use JWT unless opt-out
+
+    // 📝 Inject global logger
+    server.app.logActivity = logActivity;
+
+    // 📊 Global request logging
+    server.ext('onPreHandler', async (request, h) => {
+        if (request.path.startsWith('/swagger') || request.path === '/') return h.continue;
+
+        const { method, path } = request;
+        const user_id = request.auth?.credentials?.id || null;
+        const role = request.auth?.credentials?.role || 'public';
+
+        const action = `${method.toUpperCase()} ${path}`;
+        const detail = {
+            query: request.query,
+            payload: request.payload,
+        };
+
+        await request.server.app.logActivity({ user_id, role, action, detail });
+        return h.continue;
+    });
+
+    // 🧩 Auto-load routes from ./routes
+    const routeFiles = fs
+        .readdirSync(path.join(__dirname, 'routes'))
+        .filter(file => file.endsWith('.js'));
 
     for (const file of routeFiles) {
-        const plugin = require(path.join(__dirname, 'routes', file));
-        await server.register(plugin);
+        const routePlugin = require(path.join(__dirname, 'routes', file));
+        await server.register(routePlugin);
     }
 
+    return server;
+}
 
-
-    await server.start();
-    console.log(`🚀 Server running at: ${server.info.uri}`);
-};
+async function startServer() {
+    try {
+        const server = await createServer();
+        await server.start();
+        console.log(`🚀 Server running at: ${server.info.uri}`);
+    } catch (err) {
+        console.error('🔥 Server startup error:', err);
+        process.exit(1);
+    }
+}
 
 process.on('unhandledRejection', (err) => {
-    console.error(err);
+    console.error('🔥 Unhandled Rejection:', err);
     process.exit(1);
 });
 
-init();
+startServer();
