@@ -1,5 +1,3 @@
-// server.js
-
 require('dotenv').config();
 const Hapi = require('@hapi/hapi');
 const Inert = require('@hapi/inert');
@@ -22,7 +20,7 @@ async function createServer() {
         },
     });
 
-    // 📘 Swagger documentation
+    // 📘 Swagger
     await server.register([
         Inert,
         Vision,
@@ -39,45 +37,50 @@ async function createServer() {
         },
     ]);
 
-    // 🔐 Custom JWT auth scheme
+    // 🔐 Custom JWT Auth Scheme
     server.auth.scheme('custom-jwt', () => ({
         authenticate: async (request, h) => {
             await verifyToken(request, h);
-            return h.authenticated({ credentials: request.auth.credentials });
+            // Jika tidak isAuthenticated, beri dummy credentials agar tidak error
+            const user = request.auth?.credentials || {};
+            return h.authenticated({ credentials: user });
         },
     }));
 
     server.auth.strategy('jwt', 'custom-jwt');
-    server.auth.default('jwt'); // ✅ All routes use JWT unless opt-out
+    server.auth.default('jwt'); // All routes use JWT (except PUBLIC_ROUTES)
 
-    // 📝 Inject global logger
+    // 🔗 Inject logger
     server.app.logActivity = logActivity;
 
-    // 📊 Global request logging
+    // 📊 Global logging (except Swagger)
     server.ext('onPreHandler', async (request, h) => {
         if (request.path.startsWith('/swagger') || request.path === '/') return h.continue;
 
-        const { method, path } = request;
         const user_id = request.auth?.credentials?.id || null;
         const role = request.auth?.credentials?.role || 'public';
 
-        const action = `${method.toUpperCase()} ${path}`;
         const detail = {
             query: request.query,
             payload: request.payload,
         };
 
-        await request.server.app.logActivity({ user_id, role, action, detail });
+        await server.app.logActivity({
+            user_id,
+            role,
+            action: `${request.method.toUpperCase()} ${request.path}`,
+            detail,
+        });
+
         return h.continue;
     });
 
-    // 🧩 Auto-load routes from ./routes
-    const routeFiles = fs
-        .readdirSync(path.join(__dirname, 'routes'))
-        .filter(file => file.endsWith('.js'));
+    // 🔄 Auto-load routes from /routes
+    const routesDir = path.join(__dirname, 'routes');
+    const routeFiles = fs.readdirSync(routesDir).filter(f => f.endsWith('.js'));
 
     for (const file of routeFiles) {
-        const routePlugin = require(path.join(__dirname, 'routes', file));
+        const routePlugin = require(path.join(routesDir, file));
         await server.register(routePlugin);
     }
 

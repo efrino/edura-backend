@@ -2,7 +2,29 @@ const jwt = require('jsonwebtoken');
 const Boom = require('@hapi/boom');
 const supabase = require('../db');
 
+const PUBLIC_ROUTES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-otp',
+  '/resend-otp',
+  '/send-magic-link',
+  '/',
+];
+
 async function verifyToken(request, h) {
+  const isPublic = PUBLIC_ROUTES.includes(request.path);
+
+  // Allow public route: return dummy credentials
+  if (isPublic) {
+    request.auth = {
+      isAuthenticated: false,
+      credentials: {},
+    };
+    return h.continue;
+  }
+
   const authHeader = request.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw Boom.unauthorized('Missing or invalid Authorization header');
@@ -16,7 +38,6 @@ async function verifyToken(request, h) {
     throw Boom.unauthorized('Invalid or expired token');
   }
 
-  // Ambil user dasar
   const { data: user, error } = await supabase
     .from('users')
     .select('id, email, full_name, role, plan, plan_expires_at')
@@ -27,13 +48,13 @@ async function verifyToken(request, h) {
     throw Boom.unauthorized('User not found');
   }
 
-  // Cek expired plan
+  // Expired premium plan
   if (user.plan === 'premium' && user.plan_expires_at) {
     const now = new Date();
     const expires = new Date(user.plan_expires_at);
-
     if (expires < now) {
-      await supabase.from('users')
+      await supabase
+        .from('users')
         .update({ plan: 'free', plan_expires_at: null })
         .eq('id', user.id);
       user.plan = 'free';
@@ -41,42 +62,33 @@ async function verifyToken(request, h) {
     }
   }
 
-  // Jika role teacher, ambil daftar class_id yang dia pegang
+  // Teacher info
   if (user.role === 'teacher') {
-    const { data: teacherClassData, error: classErr } = await supabase
+    const { data: classData } = await supabase
       .from('teacher_classes')
       .select('class_id')
       .eq('teacher_id', user.id);
+    user.class_ids = classData?.map(c => c.class_id) || [];
 
-    if (!classErr && teacherClassData) {
-      user.class_ids = teacherClassData.map((c) => c.class_id); // simpan array class_id
-    } else {
-      user.class_ids = [];
-    }
-
-    // Ambil juga program_studi dari profil
-    const { data: teacherProfile } = await supabase
+    const { data: profile } = await supabase
       .from('teacher_profiles')
       .select('program_studi')
       .eq('user_id', user.id)
       .maybeSingle();
-
-    if (teacherProfile) {
-      user.program_studi = teacherProfile.program_studi;
-    }
+    if (profile) user.program_studi = profile.program_studi;
   }
 
-  // Inject
   request.auth = {
     isAuthenticated: true,
-    credentials: user
+    credentials: user,
   };
+
   return h.continue;
 }
-// Role-based access control
+
 function requireRole(...allowedRoles) {
   return (request, h) => {
-    const user = request.auth.credentials;
+    const user = request.auth?.credentials;
     if (!user || !allowedRoles.includes(user.role)) {
       throw Boom.forbidden('You do not have permission to access this resource');
     }
