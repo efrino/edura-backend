@@ -1,6 +1,7 @@
 const midtransClient = require('midtrans-client');
 const { verifyToken, requireRole } = require('../utils/middleware');
 const supabase = require('../db');
+const { getEnv } = require('../utils/env');
 
 module.exports = {
     name: 'upgrade-plan',
@@ -19,14 +20,18 @@ module.exports = {
             handler: async (request, h) => {
                 const user = request.auth.credentials;
 
+                const serverKey = await getEnv('MIDTRANS_SERVER_KEY');
+                const frontendBaseUrl = await getEnv('FRONTEND_BASE_URL');
+
                 const snap = new midtransClient.Snap({
-                    isProduction: false,
-                    serverKey: process.env.MIDTRANS_SERVER_KEY,
+                    isProduction: true,
+                    serverKey,
                 });
+
 
                 const orderId = `UPG-${user.id}-${Date.now().toString(36)}`;
                 const productName = 'Edura Premium - 1 Bulan';
-                const price = 50000;
+                const price = 500;
 
                 const transactionDetails = {
                     transaction_details: {
@@ -46,7 +51,7 @@ module.exports = {
                         email: user.email,
                     },
                     callbacks: {
-                        finish: `${process.env.FRONTEND_BASE_URL}#/payment-success`,
+                        finish: `${frontendBaseUrl}#/payment-success`,
                     },
                 };
 
@@ -106,8 +111,8 @@ module.exports = {
 
                 const userId = log.user_id;
 
-                // === Upgrade plan jika transaksi berhasil
                 if (['settlement', 'capture'].includes(status)) {
+                    // ✅ Update plan premium
                     const expiredAt = new Date();
                     expiredAt.setMonth(expiredAt.getMonth() + 1);
 
@@ -123,8 +128,29 @@ module.exports = {
                         console.error('❌ Gagal update plan user:', updateErr);
                     } else {
                         console.log('✅ Plan premium berhasil diperpanjang untuk user:', userId);
+
+                        // 📩 Kirim email konfirmasi ke user
+                        const { data: userInfo, error: userInfoErr } = await supabase
+                            .from('users')
+                            .select('full_name, email')
+                            .eq('id', userId)
+                            .maybeSingle();
+
+                        if (userInfo && userInfo.email) {
+                            try {
+                                await sendPaymentStatusEmail(userInfo.email, {
+                                    userName: userInfo.full_name || 'User',
+                                    status,
+                                    amount: body.gross_amount || 50000,
+                                });
+                                console.log(`📧 Email pembayaran dikirim ke ${userInfo.email}`);
+                            } catch (err) {
+                                console.error('❌ Gagal kirim email pembayaran:', err.message);
+                            }
+                        }
                     }
                 }
+
 
                 // === Simpan data tambahan dari Midtrans
                 const updateData = {
@@ -151,8 +177,53 @@ module.exports = {
                 return h.response({ message: 'Webhook diterima' }).code(200);
             },
         });
+        // === GET /payment/status?order_id=UPG-xxxx ===
+        server.route({
+            method: 'GET',
+            path: '/payment/status',
+            options: {
+                auth: false,
+                tags: ['api', 'Payment'],
+                description: 'Cek status pembayaran berdasarkan order_id',
+            },
+            handler: async (request, h) => {
+                const { order_id } = request.query;
 
-        // profile
+                if (!order_id) {
+                    return h.response({ message: 'order_id diperlukan' }).code(400);
+                }
+
+                const serverKey = await getEnv('MIDTRANS_SERVER_KEY');
+                const encodedKey = Buffer.from(`${serverKey}:`).toString('base64');
+
+                try {
+                    const response = await fetch(`https://api.midtrans.com/v2/${order_id}/status`, {
+                        headers: {
+                            Authorization: `Basic ${encodedKey}`,
+                            Accept: 'application/json',
+                        },
+                    });
+
+                    const data = await response.json();
+
+                    return h.response({
+                        order_id: data.order_id,
+                        transaction_status: data.transaction_status,
+                        payment_type: data.payment_type,
+                        gross_amount: data.gross_amount,
+                        va_numbers: data.va_numbers || [],
+                        transaction_time: data.transaction_time,
+                        settlement_time: data.settlement_time || null,
+                    }).code(200);
+
+                } catch (err) {
+                    console.error('❌ Gagal cek status:', err);
+                    return h.response({ message: 'Gagal mendapatkan status transaksi' }).code(500);
+                }
+            },
+        });
+
+        // === GET /me (profile)
         server.route({
             method: 'GET',
             path: '/me',

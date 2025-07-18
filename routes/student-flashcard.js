@@ -1,149 +1,241 @@
 const Joi = require('joi');
 const { verifyToken, requireRole } = require('../utils/middleware');
 const supabase = require('../db');
-const { model } = require('../utils/geminiClient');
+const { getNextModel } = require('../utils/geminiClient');
+const Boom = require('@hapi/boom');
 
 module.exports = {
     name: 'student-flashcard',
     version: '1.0.0',
     register: async function (server, options) {
-
-        // === POST /student/courses/{courseId}/sessions/{sessionNumber}/flashcard ===
-        server.route({
-            method: 'POST',
-            path: '/student/courses/{courseId}/sessions/{sessionNumber}/flashcard',
-            options: {
-                tags: ['api', 'Flashcard'],
-                description: 'Generate or fetch flashcard for a session',
-                pre: [verifyToken, requireRole('student')],
-                validate: {
-                    params: Joi.object({
-                        courseId: Joi.string().guid().required(),
-                        sessionNumber: Joi.number().integer().min(1).max(16).required(),
-                    }),
-                },
-            },
-            handler: async (request, h) => {
-                const { courseId, sessionNumber } = request.params;
-
-                // 1. Cek apakah flashcard sudah ada
-                const { data: existing, error: fetchError } = await supabase
-                    .from('course_flashcards')
-                    .select('cards')
-                    .eq('course_id', courseId)
-                    .eq('session_number', sessionNumber)
-                    .maybeSingle();
-
-                if (fetchError) {
-                    console.error(fetchError);
-                    return h.response({ message: 'Gagal mengambil data flashcard' }).code(500);
-                }
-
-                if (existing) {
-                    return h.response({ message: 'Flashcard sudah tersedia', cards: existing.cards }).code(200);
-                }
-
-                // 2. Ambil title & content dari course_sessions
-                const { data: session, error: sessionError } = await supabase
-                    .from('course_sessions')
-                    .select('title, content')
-                    .eq('course_id', courseId)
-                    .eq('session_number', sessionNumber)
-                    .single();
-
-                if (sessionError || !session) {
-                    return h.response({ message: 'Sesi tidak ditemukan' }).code(404);
-                }
-
-                const parsedContent = typeof session.content === 'string' ? JSON.parse(session.content) : session.content;
-
-                // 3. Generate flashcard dari Gemini
-                const prompt = `Buatkan flashcard pembelajaran dari materi berikut dengan format JSON array.
-Judul: "${session.title}"
-Materi:
-${parsedContent?.overview || ''}
-
-Langkah-langkah:
-${(parsedContent?.steps || []).join('\n')}
-
-Format output:
-[
-  { "term": "istilah 1", "definition": "penjelasan istilah 1" },
-  ...
-]`;
-
-                let flashcards = [];
-
-                try {
-                    const result = await model.generateContent({
-                        contents: [{ parts: [{ text: prompt }] }]
-                    });
-                    const text = result.response.text().trim();
-                    const jsonStart = text.indexOf('[');
-                    const jsonEnd = text.lastIndexOf(']');
-                    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Tidak ditemukan array flashcard');
-
-                    const flashcardJson = text.slice(jsonStart, jsonEnd + 1);
-                    flashcards = JSON.parse(flashcardJson);
-                } catch (err) {
-                    console.error('Gagal generate flashcard:', err);
-                    return h.response({ message: 'Gagal generate flashcard' }).code(500);
-                }
-
-                // 4. Simpan ke Supabase
-                const { error: insertError } = await supabase
-                    .from('course_flashcards')
-                    .insert({
-                        course_id: courseId,
-                        session_number: sessionNumber,
-                        cards: flashcards,
-                    });
-
-                if (insertError) {
-                    console.error(insertError);
-                    return h.response({ message: 'Gagal menyimpan flashcard' }).code(500);
-                }
-
-                return h.response({ message: 'Flashcard berhasil digenerate', cards: flashcards }).code(201);
-            }
-        });
-
-        // === GET /student/courses/{courseId}/sessions/{sessionNumber}/flashcard ===
+        // === GET flashcards for student ===
         server.route({
             method: 'GET',
-            path: '/student/courses/{courseId}/sessions/{sessionNumber}/flashcard',
+            path: '/student/flashcards',
             options: {
-                tags: ['api', 'Flashcard'],
-                description: 'Get flashcard for a specific session in a course',
+                tags: ['api', 'Student', 'Flashcard'],
+                description: 'Get student flashcards for a specific course',
                 pre: [verifyToken, requireRole('student')],
                 validate: {
-                    params: Joi.object({
-                        courseId: Joi.string().guid().required(),
-                        sessionNumber: Joi.number().integer().min(1).max(16).required(),
+                    query: Joi.object({
+                        course_id: Joi.string().required(),
                     }),
                 },
             },
-            handler: async (request, h) => {
-                const { courseId, sessionNumber } = request.params;
+            handler: async (req, h) => {
+                const { course_id } = req.query;
+                const student_id = req.auth.credentials.id;
 
-                const { data, error } = await supabase
-                    .from('course_flashcards')
-                    .select('cards')
-                    .eq('course_id', courseId)
-                    .eq('session_number', sessionNumber)
-                    .maybeSingle();
+                try {
+                    const { data, error } = await supabase
+                        .from('student_flashcards')
+                        .select('session_number, cards, created_at')
+                        .eq('student_id', student_id)
+                        .eq('course_id', course_id)
+                        .order('session_number');
 
-                if (error) {
-                    console.error(error);
-                    return h.response({ message: 'Gagal mengambil data flashcard' }).code(500);
+                    if (error) throw error;
+                    if (!data || data.length === 0) {
+                        return Boom.notFound('Flashcards not found for this course');
+                    }
+
+                    return h.response({
+                        message: 'Flashcards found',
+                        flashcards: data,
+                    }).code(200);
+                } catch (err) {
+                    console.error('🔥 Error fetching student flashcards:', err);
+                    return Boom.internal('Failed to fetch student flashcards');
                 }
+            },
+        });
+        // === GET Flashcard Generation Status ===
+        server.route({
+            method: 'GET',
+            path: '/student/flashcards/status',
+            options: {
+                tags: ['api', 'Student', 'Flashcard'],
+                description: 'Check flashcard generation status for a course',
+                pre: [verifyToken, requireRole('student')],
+                validate: {
+                    query: Joi.object({
+                        course_id: Joi.string().required(),
+                    }),
+                },
+            },
+            handler: async (req, h) => {
+                const { course_id } = req.query;
+                const student_id = req.auth.credentials.id;
 
-                if (!data) {
-                    return h.response({ message: 'Flashcard belum tersedia untuk sesi ini' }).code(404);
+                try {
+                    const { data, error } = await supabase
+                        .from('student_flashcard_status')
+                        .select('status, updated_at')
+                        .eq('student_id', student_id)
+                        .eq('course_id', course_id)
+                        .maybeSingle();
+
+                    if (error) {
+                        console.error('🔥 Error checking flashcard status:', error.message);
+                        return Boom.internal('Failed to check flashcard status');
+                    }
+
+                    if (!data) {
+                        return h.response({
+                            status: 'not_started',
+                            message: 'Belum ada proses generate dimulai.',
+                        }).code(200);
+                    }
+
+                    return h.response({
+                        status: data.status,
+                        updated_at: data.updated_at,
+                        message: `Status: ${data.status}`,
+                    }).code(200);
+                } catch (err) {
+                    console.error('🔥 Error checking status:', err);
+                    return Boom.internal('Failed to check status');
                 }
+            },
+        });
 
-                return h.response({ cards: data.cards }).code(200);
+
+        // === POST generate flashcards ===
+        server.route({
+            method: 'POST',
+            path: '/student/flashcards/generate',
+            options: {
+                tags: ['api', 'Student', 'Flashcard'],
+                description: 'Generate 1 flashcard per session (batch async-style)',
+                pre: [verifyToken, requireRole('student')],
+                validate: {
+                    payload: Joi.object({
+                        course_id: Joi.string().required(),
+                    }),
+                },
+            },
+            handler: async (req, h) => {
+                const { course_id } = req.payload;
+                const student_id = req.auth.credentials.id;
+
+                try {
+                    // 1. Cek status
+                    const { data: statusRow } = await supabase
+                        .from('student_flashcard_status')
+                        .select('status')
+                        .eq('student_id', student_id)
+                        .eq('course_id', course_id)
+                        .maybeSingle();
+
+                    if (statusRow?.status === 'generating') {
+                        return Boom.badRequest('Flashcards sedang diproses. Silakan tunggu.');
+                    }
+
+                    // 2. Set status jadi generating
+                    await supabase.from('student_flashcard_status').upsert({
+                        student_id,
+                        course_id,
+                        status: 'generating',
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: 'student_id,course_id' });
+
+                    // 3. Proses langsung (tanpa setTimeout)
+                    const { data: sessions } = await supabase
+                        .from('course_sessions')
+                        .select('session_number, title, content')
+                        .eq('course_id', course_id)
+                        .order('session_number');
+
+                    const model = getNextModel();
+                    let flashcardsToInsert = [];
+
+                    for (const session of sessions.slice(0, 10)) {
+                        const { session_number, title, content } = session;
+
+                        let cards = [];
+                        const { data: existingFC } = await supabase
+                            .from('course_flashcards')
+                            .select('cards')
+                            .eq('course_id', course_id)
+                            .eq('session_number', session_number)
+                            .maybeSingle();
+
+                        if (existingFC?.cards?.length >= 5) {
+                            cards = existingFC.cards;
+                        } else {
+                            const prompt = `
+Kamu adalah AI pengajar. Buatkan 16 flashcard dalam format JSON array:
+[{"question":"Apa itu ...?","answer":"..."}]
+Judul: ${title}
+Materi: ${content}
+`;
+                            const result = await model.generateContent({
+                                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                            });
+
+                            const text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                            const jsonMatch = text.match(/\[\s*{[\s\S]*?}\s*\]/);
+                            try {
+                                if (jsonMatch) cards = JSON.parse(jsonMatch[0]);
+                            } catch (_) { }
+
+                            if (cards.length >= 8) {
+                                cards = cards.sort(() => 0.5 - Math.random()).slice(0, 5);
+                                await supabase.from('course_flashcards').upsert({
+                                    course_id,
+                                    session_number,
+                                    cards,
+                                    created_at: new Date().toISOString(),
+                                }, { onConflict: 'course_id,session_number' });
+                            }
+                        }
+
+                        if (cards.length > 0) {
+                            const selected = cards[Math.floor(Math.random() * cards.length)];
+                            flashcardsToInsert.push({
+                                student_id,
+                                course_id,
+                                session_number,
+                                cards: [selected],
+                                created_at: new Date().toISOString(),
+                            });
+                        }
+                    }
+
+                    if (flashcardsToInsert.length > 0) {
+                        await supabase
+                            .from('student_flashcards')
+                            .insert(flashcardsToInsert, { ignoreDuplicates: true });
+
+                        await supabase
+                            .from('student_flashcard_status')
+                            .update({ status: 'done', updated_at: new Date().toISOString() })
+                            .eq('student_id', student_id)
+                            .eq('course_id', course_id);
+
+                        return h.response({
+                            message: 'Flashcards berhasil digenerate',
+                            status: 'done',
+                        }).code(200);
+                    } else {
+                        await supabase
+                            .from('student_flashcard_status')
+                            .update({ status: 'failed', updated_at: new Date().toISOString() })
+                            .eq('student_id', student_id)
+                            .eq('course_id', course_id);
+
+                        return Boom.badData('Gagal membuat flashcards. Tidak ada konten tersedia.');
+                    }
+
+                } catch (err) {
+                    console.error('❌ Error:', err.message);
+                    await supabase.from('student_flashcard_status').update({
+                        status: 'failed', updated_at: new Date().toISOString()
+                    }).eq('student_id', student_id).eq('course_id', course_id);
+                    return Boom.internal('Gagal generate flashcards.');
+                }
             },
         });
     },
-};
+
+}

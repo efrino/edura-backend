@@ -8,6 +8,7 @@ const path = require('path');
 
 const { verifyToken } = require('./utils/middleware');
 const { logActivity } = require('./utils/activity-logger');
+const { loadActiveGeminiKey } = require('./utils/geminiClient'); // ⬅️ tambahkan ini
 
 async function createServer() {
     const server = Hapi.server({
@@ -41,14 +42,13 @@ async function createServer() {
     server.auth.scheme('custom-jwt', () => ({
         authenticate: async (request, h) => {
             await verifyToken(request, h);
-            // Jika tidak isAuthenticated, beri dummy credentials agar tidak error
             const user = request.auth?.credentials || {};
             return h.authenticated({ credentials: user });
         },
     }));
 
     server.auth.strategy('jwt', 'custom-jwt');
-    server.auth.default('jwt'); // All routes use JWT (except PUBLIC_ROUTES)
+    server.auth.default('jwt');
 
     // 🔗 Inject logger
     server.app.logActivity = logActivity;
@@ -75,7 +75,10 @@ async function createServer() {
         return h.continue;
     });
 
-    // 🔄 Auto-load routes from /routes
+    // 🔄 Load Gemini API Key aktif dari Supabase
+    await loadActiveGeminiKey(); // ⬅️ Tambahkan ini sebelum route berjalan
+
+    // 📁 Auto-load routes
     const routesDir = path.join(__dirname, 'routes');
     const routeFiles = fs.readdirSync(routesDir).filter(f => f.endsWith('.js'));
 

@@ -12,7 +12,7 @@ module.exports = {
             path: '/teacher/class/{id}/grades',
             options: {
                 tags: ['api', 'Teacher'],
-                description: 'Ambil semua siswa dalam satu kelas (tanpa nilai)',
+                description: 'Ambil nilai siswa per kelas (kelompok per siswa)',
                 pre: [verifyToken, requireRole('teacher')],
                 validate: {
                     params: Joi.object({
@@ -23,17 +23,45 @@ module.exports = {
             handler: async (req, h) => {
                 const classId = req.params.id;
 
-                const { data, error } = await db
-                    .from('student_profiles')
-                    .select('id, full_name, nim, program_studi, jurusan, perguruan_tinggi')
-                    .eq('class_id', classId);
+                try {
+                    const { data, error } = await db.rpc('get_class_grades_grouped', {
+                        class_input: classId,
+                    });
 
-                if (error) {
-                    console.error(error);
-                    return Boom.internal('Gagal mengambil data siswa');
+                    if (error) {
+                        console.error('❌ Failed to fetch grouped class grades:', error);
+                        return Boom.internal('Gagal mengambil data nilai kelas');
+                    }
+
+                    // Normalisasi dan beri status kelulusan
+                    const enrichedData = (data || []).map((student) => {
+                        const courses = Array.isArray(student.courses) ? student.courses : [];
+
+                        const enrichedCourses = courses.map((course) => {
+                            const score = course.score_final_exam;
+
+                            let status = 'belum ikut ujian';
+                            if (typeof score === 'number') {
+                                status = score >= 60 ? 'lulus' : 'tidak lulus';
+                            }
+
+                            return {
+                                ...course,
+                                status_kelulusan: status,
+                            };
+                        });
+
+                        return {
+                            ...student,
+                            courses: enrichedCourses,
+                        };
+                    });
+
+                    return h.response(enrichedData);
+                } catch (err) {
+                    console.error('🔥 Unexpected error:', err);
+                    return Boom.internal('Terjadi kesalahan saat mengambil data nilai');
                 }
-
-                return data;
             },
         });
     },

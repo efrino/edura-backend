@@ -36,7 +36,7 @@ module.exports = {
                     return Boom.notFound('Course tidak ditemukan');
                 }
 
-                // 2. Ambil daftar sesi dari course_sessions
+                // 2. Ambil daftar sesi
                 const { data: sessions, error: sessionError } = await supabase
                     .from('course_sessions')
                     .select('session_number, title, content')
@@ -51,7 +51,7 @@ module.exports = {
                 // 3. Ambil data student_courses
                 const { data: progress, error: progressError } = await supabase
                     .from('student_courses')
-                    .select('checkpoint, is_completed, score_final_exam')
+                    .select('checkpoint, is_completed')
                     .eq('student_id', studentId)
                     .eq('course_id', courseId)
                     .maybeSingle();
@@ -61,8 +61,16 @@ module.exports = {
                     return Boom.notFound('Data student_course tidak ditemukan');
                 }
 
-                // 4. Cek apakah final exam tersedia
-                const { data: finalExamTemplate, error: finalExamError } = await supabase
+                // 4. Ambil nilai final exam dari tabel baru
+                const { data: examResult } = await supabase
+                    .from('student_finalexam_results')
+                    .select('score')
+                    .eq('student_id', studentId)
+                    .eq('course_id', courseId)
+                    .maybeSingle();
+
+                // 5. Cek apakah eligible untuk ujian
+                const { data: finalExamTemplate } = await supabase
                     .from('course_finalexams')
                     .select('id')
                     .eq('course_id', courseId)
@@ -80,7 +88,10 @@ module.exports = {
                         is_verified: course.is_verified
                     },
                     sessions,
-                    progress,
+                    progress: {
+                        ...progress,
+                        score_final_exam: examResult?.score ?? null
+                    },
                     isEligibleForFinalExam
                 });
             }

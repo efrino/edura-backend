@@ -115,16 +115,18 @@ module.exports = {
                         email: Joi.string().email().required(),
                         name: Joi.string().required(),
                         reason: Joi.string().required(),
+                        course_id: Joi.string().uuid().optional(), // tambahkan ini
                     }),
                 },
             },
             handler: async (request, h) => {
-                const { email, name, reason } = request.payload;
+                const { email, name, reason, course_id } = request.payload;
 
                 try {
                     await sendStudentNotification(email, {
                         studentName: name,
-                        message: reason
+                        message: reason,
+                        course_id
                     });
 
                     return { message: 'Notifikasi berhasil dikirim' };
@@ -141,7 +143,7 @@ module.exports = {
             path: '/teacher/notify-bulk',
             options: {
                 tags: ['api', 'Teacher'],
-                description: 'Kirim notifikasi ke semua student dalam class yang butuh perhatian',
+                description: 'Kirim notifikasi ke semua student dalam class yang sama dimana yang belum punya score_final',
                 pre: [verifyToken, requireRole('teacher')],
                 validate: {
                     payload: Joi.object({

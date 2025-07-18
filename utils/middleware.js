@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Boom = require('@hapi/boom');
 const supabase = require('../db');
+const { getEnv } = require('./env'); // ← tambahkan ini
 
 const PUBLIC_ROUTES = [
   '/login',
@@ -9,6 +10,7 @@ const PUBLIC_ROUTES = [
   '/reset-password',
   '/verify-otp',
   '/resend-otp',
+  '/verify-email',
   '/send-magic-link',
   '/',
 ];
@@ -31,9 +33,11 @@ async function verifyToken(request, h) {
   }
 
   const token = authHeader.split(' ')[1];
+
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const jwtSecret = await getEnv('JWT_SECRET'); // ← ambil dari Supabase
+    decoded = jwt.verify(token, jwtSecret);
   } catch (err) {
     throw Boom.unauthorized('Invalid or expired token');
   }
@@ -64,11 +68,13 @@ async function verifyToken(request, h) {
 
   // Teacher info
   if (user.role === 'teacher') {
+    // Ambil id kelas dengan benar
     const { data: classData } = await supabase
-      .from('teacher_classes')
-      .select('class_id')
+      .from('classes')
+      .select('id') // ← ubah dari 'name' menjadi 'id'
       .eq('teacher_id', user.id);
-    user.class_ids = classData?.map(c => c.class_id) || [];
+
+    user.class_ids = classData?.map(c => c.id) || [];
 
     const { data: profile } = await supabase
       .from('teacher_profiles')

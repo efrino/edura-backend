@@ -79,7 +79,7 @@ module.exports = {
                 if (userPlan === 'free' && courseCount >= 5) {
                     return h.response({
                         message: 'Kamu sudah memiliki 5 course. Upgrade ke akun premium untuk menambah kuota.',
-                        upgrade_required: true
+                        upgrade_required: true,
                     }).code(403);
                 }
 
@@ -93,7 +93,6 @@ module.exports = {
 
                 // === Normalisasi & cek kemiripan subject ===
                 const normalizedInput = normalizeSubject(subject);
-
                 const { data: similarCourses } = await supabase
                     .from('courses')
                     .select('id, subject')
@@ -101,16 +100,14 @@ module.exports = {
                     .eq('level', level);
 
                 if (similarCourses && similarCourses.length > 0) {
-                    const matches = similarCourses.map(course => {
-                        return {
-                            id: course.id,
-                            subject: course.subject,
-                            similarity: stringSimilarity.compareTwoStrings(
-                                normalizeSubject(course.subject),
-                                normalizedInput
-                            )
-                        };
-                    });
+                    const matches = similarCourses.map((course) => ({
+                        id: course.id,
+                        subject: course.subject,
+                        similarity: stringSimilarity.compareTwoStrings(
+                            normalizeSubject(course.subject),
+                            normalizedInput
+                        ),
+                    }));
 
                     matches.sort((a, b) => b.similarity - a.similarity);
 
@@ -126,29 +123,43 @@ module.exports = {
                         if (!taken) {
                             await supabase.from('student_courses').insert({
                                 student_id: userId,
-                                course_id: reusedCourse.id
+                                course_id: reusedCourse.id,
                             });
                         }
 
                         return h.response({
                             message: `Course dengan topik serupa "${reusedCourse.subject}" sudah tersedia, kamu langsung masuk.`,
                             course_id: reusedCourse.id,
-                            reused: true
+                            reused: true,
                         }).code(200);
                     }
                 }
 
-                // === GENERATE COURSE BARU ===
-                const prompt = `Buatkan course pembelajaran dengan level ${level} untuk program studi ${programStudi}.
-Topik utama course adalah "${subject}". Formatkan output sebagai berikut:
+                // === GENERATE PROMPT (tanpa generate konten langsung) ===
+                const prompt = `Kamu adalah AI pengajar profesional untuk mahasiswa program studi ${programStudi}.
+
+Buatkan satu course pembelajaran **tingkat ${level}** dengan topik utama "${subject}", dalam format struktur sebagai berikut dan *jangan menambahkan penjelasan tambahan*:
 
 Judul: <judul course>
-Deskripsi: <deskripsi>
+Deskripsi: <deskripsi singkat course>
 
-Berikut 16 pertemuan:
-1. <judul 1>
-...
-16. <judul 16>`;
+1. <judul sesi 1>
+2. <judul sesi 2>
+3. <judul sesi 3>
+4. <judul sesi 4>
+5. <judul sesi 5>
+6. <judul sesi 6>
+7. <judul sesi 7>
+8. <judul sesi 8>
+9. <judul sesi 9>
+10. <judul sesi 10>
+11. <judul sesi 11>
+12. <judul sesi 12>
+13. <judul sesi 13>
+14. <judul sesi 14>
+15. <judul sesi 15>
+16. <judul sesi 16>`;
+
 
                 let generated;
                 let success = false;
@@ -176,6 +187,7 @@ Berikut 16 pertemuan:
                 if (!parsed.title || parsed.sessions.length !== 16) {
                     return h.response({ message: 'Output Gemini tidak valid. Harus ada 16 sesi dan judul.' }).code(400);
                 }
+
                 const { data: course, error: courseError } = await supabase
                     .from('courses')
                     .insert({
@@ -186,19 +198,18 @@ Berikut 16 pertemuan:
                         program_studi: programStudi,
                         level,
                         is_verified: false,
-                        is_generating: true
+                        is_generating: true,
                     })
                     .select()
                     .single();
 
                 if (courseError) return h.response({ message: 'Gagal menyimpan course' }).code(500);
 
-                // Langsung tambahkan ke student_courses meskipun masih generating
                 const { error: insertStudentCourseError } = await supabase
                     .from('student_courses')
                     .insert({
                         student_id: userId,
-                        course_id: course.id
+                        course_id: course.id,
                     });
 
                 if (insertStudentCourseError) {
@@ -206,57 +217,26 @@ Berikut 16 pertemuan:
                     return h.response({ message: 'Gagal menyimpan progress student' }).code(500);
                 }
 
+                // === Insert sesi kosong tanpa content ===
+                const sessionPayloads = parsed.sessions.map((session, index) => ({
+                    course_id: course.id,
+                    session_number: index + 1,
+                    title: session.title,
+                    content: null,
+                }));
 
-                const sessionsData = [];
-                for (let i = 0; i < parsed.sessions.length; i++) {
-                    const session = parsed.sessions[i];
-                    try {
-                        const content = await generateContentForTitle(session.title);
-                        sessionsData.push({
-                            course_id: course.id,
-                            session_number: i + 1,
-                            title: session.title,
-                            content
-                        });
-                    } catch (err) {
-                        await supabase.from('courses').delete().eq('id', course.id);
-                        const msg = err.message.includes('Kuota generate habis')
-                            ? err.message
-                            : 'Gagal generate sesi. Course dibatalkan.';
-                        return h.response({ message: msg }).code(429);
-                    }
-
-                    logActivity('SESSION_GENERATE', `Session ${i + 1}: ${session.title}`);
-                }
-
-                const { error: insertSessionError } = await supabase.from('course_sessions').insert(sessionsData);
-                if (insertSessionError) {
+                const { error: sessionInsertError } = await supabase.from('course_sessions').insert(sessionPayloads);
+                if (sessionInsertError) {
                     await supabase.from('courses').delete().eq('id', course.id);
-                    return h.response({ message: 'Gagal simpan sesi. Course dibatalkan.' }).code(500);
+                    return h.response({ message: 'Gagal menyimpan sesi awal. Course dibatalkan.' }).code(500);
                 }
 
-                await supabase.from('courses').update({ is_generating: false }).eq('id', course.id);
-                const { data: alreadyJoined } = await supabase
-                    .from('student_courses')
-                    .select('id')
-                    .eq('student_id', userId)
-                    .eq('course_id', course.id)
-                    .maybeSingle();
-
-                if (!alreadyJoined) {
-                    await supabase.from('student_courses').insert({
-                        student_id: userId,
-                        course_id: course.id
-                    });
-                }
-
-
-                logActivity('COURSE_SUCCESS', `Course created: ${course.id}`);
+                logActivity('COURSE_SUCCESS', `Course created (awaiting content): ${course.id}`);
 
                 return h.response({
-                    message: 'Course berhasil dibuat dan ditambahkan ke akunmu',
+                    message: 'Course berhasil dibuat dan akan digenerate dalam beberapa menit.',
                     course_id: course.id,
-                    reused: false
+                    reused: false,
                 }).code(201);
             }
         });

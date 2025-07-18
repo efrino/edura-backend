@@ -9,7 +9,7 @@ const {
 } = require('../utils/email');
 const Joi = require('joi');
 const { v4: uuidv4 } = require('uuid');
-require('dotenv').config(); // pastikan juga baris ini ada
+const { getEnv } = require('../utils/env'); // ✅ tambahkan ini di atas
 
 module.exports = {
     name: 'auth-routes',
@@ -386,6 +386,9 @@ module.exports = {
                         }).eq('id', user.id);
                         if (e2) throw e2;
 
+                        // ✅ Ambil JWT_SECRET dari env_config
+                        const jwtSecret = await getEnv('JWT_SECRET');
+
                         // ✅ Buat JWT token
                         const token = jwt.sign(
                             {
@@ -393,8 +396,8 @@ module.exports = {
                                 email: user.email,
                                 role: user.role
                             },
-                            process.env.JWT_SECRET,
-                            { expiresIn: '7d' } // expired dalam 1 jam
+                            jwtSecret,
+                            { expiresIn: '7d' } // token berlaku 7 hari
                         );
 
                         return {
@@ -408,7 +411,8 @@ module.exports = {
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },
-            },
+            }
+            ,
             {
                 method: 'POST',
                 path: '/resend-otp',
