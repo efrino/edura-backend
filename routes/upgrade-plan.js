@@ -29,9 +29,9 @@ module.exports = {
                 });
 
 
-                const orderId = `UPG-${user.id}-${Date.now().toString(36)}`;
+                const orderId = `EPP-${user.id}-${Date.now().toString(36)}`;
                 const productName = 'Edura Premium - 1 Bulan';
-                const price = 500;
+                const price = 50000;
 
                 const transactionDetails = {
                     transaction_details: {
