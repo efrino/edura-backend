@@ -41,7 +41,7 @@ module.exports = {
                             .eq('email', email)
                             .maybeSingle();
 
-                        if (e1) throw e1;
+                        if (e1) throw new Error (e1.message);
                         if (existing) return h.response({ error: 'Email already registered' }).code(400);
 
                         const hashedPassword = await bcrypt.hash(password, 10);
@@ -58,7 +58,7 @@ module.exports = {
                             magic_expires_at: magicExpires
                         }).select('id').single();
 
-                        if (e2) throw e2;
+                        if (e2) throw new Error (e2.message);
                         await sendMagicLinkEmail(email, magicToken);
 
                         return h.response({ message: 'Registration successful. Please check your email to verify your account.' }).code(201);
@@ -101,7 +101,7 @@ module.exports = {
                             magic_token: null,
                             magic_expires_at: null
                         }).eq('id', user.id);
-                        if (e2) throw e2;
+                        if (e2) throw new Error (e2.message);
 
                         return h.response({ message: 'Email verified successfully!' });
                     } catch (err) {
@@ -134,7 +134,7 @@ module.exports = {
                             .eq('email', email)
                             .maybeSingle();
 
-                        if (e1) throw e1;
+                        if (e1) throw new Error (e1.message);
                         if (!user) {
                             return h.response({ error: 'Email not registered' }).code(404);
                         }
@@ -164,7 +164,7 @@ module.exports = {
                             otp_code: otp,
                             otp_expires_at: expiry
                         }).eq('id', user.id);
-                        if (e2) throw e2;
+                        if (e2) throw new Error (e2.message);
 
                         await sendOtpEmail(email, otp);
                         return { message: 'OTP sent to your email' };
@@ -197,7 +197,7 @@ module.exports = {
                             .eq('email', email)
                             .maybeSingle();
 
-                        if (e1) throw e1;
+                        if (e1) throw new Error (e1.message);
                         if (!user) return h.response({ error: 'Email not found' }).code(404);
                         if (user.is_verified) return h.response({ error: 'Email already verified' }).code(400);
 
@@ -208,7 +208,7 @@ module.exports = {
                             magic_token: magicToken,
                             magic_expires_at: magicExpires
                         }).eq('id', user.id);
-                        if (e2) throw e2;
+                        if (e2) throw new Error (e2.message);
 
                         await sendMagicLinkEmail(email, magicToken);
                         return { message: 'Magic link resent to email' };
@@ -255,10 +255,6 @@ module.exports = {
                         const token = uuidv4();
                         const hashedToken = hashToken(token);
                         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam dari sekarang
-
-                        console.log('🔑 [Forgot Password] Token (plain):', token);
-                        console.log('🔒 [Forgot Password] Token (hashed):', hashedToken);
-                        console.log('🕓 [Forgot Password] Expired At:', expiresAt.toISOString());
 
                         await db.from('users').update({
                             reset_token: hashedToken,
@@ -373,7 +369,7 @@ module.exports = {
                             .eq('email', email)
                             .maybeSingle();
 
-                        if (e1) throw e1;
+                        if (e1) throw new Error (e1.message);
                         if (!user) return h.response({ error: 'User not found' }).code(404);
                         if (user.otp_code !== otp || new Date() > new Date(user.otp_expires_at)) {
                             return h.response({ error: 'Invalid or expired OTP' }).code(401);
@@ -384,7 +380,7 @@ module.exports = {
                             otp_code: null,
                             otp_expires_at: null
                         }).eq('id', user.id);
-                        if (e2) throw e2;
+                        if (e2) throw new Error(e2.message);
 
                         // ✅ Ambil JWT_SECRET dari env_config
                         const jwtSecret = await getEnv('JWT_SECRET');
@@ -434,7 +430,7 @@ module.exports = {
                             .eq('email', email)
                             .maybeSingle();
 
-                        if (e1) throw e1;
+                        if (e1) throw new Error (e1.message);
                         if (!user) return h.response({ error: 'Email not found' }).code(404);
                         if (!user.is_verified) return h.response({ error: 'Email not verified' }).code(401);
 

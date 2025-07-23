@@ -57,7 +57,7 @@ module.exports = {
                         data: exam,
                     });
                 } catch (err) {
-                    console.error('🔥 Error fetching final exam:', err);
+                    // console.error('🔥 Error fetching final exam:', err);
                     return Boom.internal('Gagal mengambil data final exam');
                 }
             },
@@ -101,7 +101,7 @@ module.exports = {
                         updated_at: data.updated_at,
                     });
                 } catch (err) {
-                    console.error('🔥 Error checking final exam status:', err);
+                    // console.error('🔥 Error checking final exam status:', err);
                     return Boom.internal('Gagal memeriksa status final exam');
                 }
             },
@@ -185,8 +185,8 @@ Kamu adalah AI pengajar. Buatkan 30 soal final exam pilihan ganda dalam format J
 [
   {
     "question": "Apa itu ...?",
-    "options": ["A", "B", "C", "D"],
-    "answer": "A"
+    "options": ["string", "string", "string", "string"],
+    "answer": "string"
   }
 ]
 Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMateri: ${s.content}`).join('\n\n')}
@@ -236,7 +236,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                                 .eq('course_id', course_id);
 
                         } catch (err) {
-                            console.error('❌ Final exam async failed:', err);
+                            // console.error('❌ Final exam async failed:', err);
                             await supabase
                                 .from('student_finalexam_status')
                                 .update({ status: 'failed', updated_at: new Date().toISOString() })
@@ -250,7 +250,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                         status: 'generating',
                     }).code(202);
                 } catch (err) {
-                    console.error('🔥 Error starting final exam:', err);
+                    // console.error('🔥 Error starting final exam:', err);
                     return Boom.internal('Gagal memulai proses final exam');
                 }
             },
@@ -356,7 +356,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                         score
                     });
                 } catch (err) {
-                    console.error('🔥 Error submitting final exam:', err);
+                    // console.error('🔥 Error submitting final exam:', err);
                     return Boom.internal('Gagal submit final exam');
                 }
             }
@@ -394,7 +394,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                         result: data
                     });
                 } catch (err) {
-                    console.error('🔥 Error fetching final exam result:', err);
+                    // console.error('🔥 Error fetching final exam result:', err);
                     return Boom.internal('Gagal mengambil hasil final exam');
                 }
             }
@@ -405,7 +405,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
             options: {
                 tags: ['api', 'Student', 'Final Exam'],
                 description: 'Leaderboard siswa dalam satu kelas berdasarkan nilai akhir',
-                pre: [verifyToken],
+                pre: [verifyToken, requireRole('student')],
                 validate: {
                     query: Joi.object({
                         course_id: Joi.string().required(),
@@ -415,14 +415,16 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
             },
             handler: async (req, h) => {
                 const { course_id, class_id } = req.query;
+                const current_user_id = req.auth.credentials.id; // Get current user ID
 
                 try {
                     // Ambil semua hasil final exam yang sudah submit
                     const { data: results, error } = await supabase
                         .from('student_finalexam_results')
-                        .select('student_id, score')
+                        .select('student_id, score, submitted_at')
                         .eq('course_id', course_id)
-                        .order('score', { ascending: false });
+                        .order('score', { ascending: false })
+                        .order('submitted_at', { ascending: true }); // Secondary sort by submission time
 
                     if (error) throw error;
 
@@ -444,14 +446,18 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                         .filter(r => profileMap.has(r.student_id))
                         .map((r, idx) => ({
                             rank: idx + 1,
+                            student_id: r.student_id, // Include student_id for frontend identification
                             name: profileMap.get(r.student_id),
                             score: r.score,
+                            submitted_at: r.submitted_at,
+                            isCurrentUser: r.student_id === current_user_id // Flag untuk current user
                         }));
 
                     return h.response({
                         message: 'Leaderboard berhasil diambil',
                         total_participants: leaderboard.length,
                         leaderboard,
+                        current_user_rank: leaderboard.find(entry => entry.isCurrentUser)?.rank || null
                     });
                 } catch (err) {
                     console.error('🔥 Error leaderboard:', err);

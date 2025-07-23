@@ -1,17 +1,55 @@
-//utils/certificate.js
+// //utils/certificate.js
 
+// const fs = require('fs');
+// const path = require('path');
+// const puppeteer = require('puppeteer');
+
+// /**
+//  * Generate a PDF certificate using Puppeteer and HTML template
+//  * @param {Object} data - Certificate data
+//  * @param {string} data.fullName - Student's full name
+//  * @param {string} data.courseTitle - Course title
+//  * @param {string} data.teacherName - Teacher's full name (from teacher_profiles)
+//  * @param {string|number} data.score - Final score of the student
+//  */
+// async function generateCertificate({ fullName, courseTitle, teacherName, score }) {
+//     const templatePath = path.join(__dirname, 'template.html');
+//     let html = fs.readFileSync(templatePath, 'utf-8');
+
+//     const now = new Date();
+//     const formattedDate = now.toLocaleDateString('id-ID', {
+//         day: 'numeric', month: 'long', year: 'numeric'
+//     });
+
+//     html = html
+//         .replace('{{FULL_NAME}}', fullName)
+//         .replace('{{COURSE_TITLE}}', courseTitle)
+//         .replace('{{TEACHER_NAME}}', teacherName || 'Unknown')
+//         .replace('{{FINAL_SCORE}}', score ?? 'N/A')
+//         .replace('{{YEAR}}', now.getFullYear())
+//         .replace('{{DATE}}', formattedDate);
+
+
+//     const browser = await puppeteer.launch();
+//     const page = await browser.newPage();
+
+//     await page.setContent(html, { waitUntil: 'networkidle0' });
+
+//     const buffer = await page.pdf({
+//         format: 'A4',
+//         printBackground: true
+//     });
+
+//     await browser.close();
+//     return buffer;
+// }
+
+// module.exports = { generateCertificate };
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { v4: uuidv4 } = require('uuid');
 
-/**
- * Generate a PDF certificate using Puppeteer and HTML template
- * @param {Object} data - Certificate data
- * @param {string} data.fullName - Student's full name
- * @param {string} data.courseTitle - Course title
- * @param {string} data.teacherName - Teacher's full name (from teacher_profiles)
- * @param {string|number} data.score - Final score of the student
- */
 async function generateCertificate({ fullName, courseTitle, teacherName, score }) {
     const templatePath = path.join(__dirname, 'template.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
@@ -27,8 +65,8 @@ async function generateCertificate({ fullName, courseTitle, teacherName, score }
         .replace('{{TEACHER_NAME}}', teacherName || 'Unknown')
         .replace('{{FINAL_SCORE}}', score ?? 'N/A')
         .replace('{{YEAR}}', now.getFullYear())
-        .replace('{{DATE}}', formattedDate);
-
+        .replace('{{DATE}}', formattedDate)
+        .replace('{{CERTIFICATE_ID}}', uuidv4().substring(0, 8).toUpperCase());
 
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -37,7 +75,14 @@ async function generateCertificate({ fullName, courseTitle, teacherName, score }
 
     const buffer = await page.pdf({
         format: 'A4',
-        printBackground: true
+        landscape: true, // Tambahkan opsi landscape
+        printBackground: true,
+        margin: {
+            top: '0px',
+            right: '0px',
+            bottom: '0px',
+            left: '0px'
+        }
     });
 
     await browser.close();

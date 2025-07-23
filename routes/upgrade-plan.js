@@ -223,20 +223,7 @@ module.exports = {
             },
         });
 
-        // === GET /me (profile)
-        server.route({
-            method: 'GET',
-            path: '/me',
-            options: {
-                tags: ['api', 'User'],
-                description: 'Get current logged-in user',
-                pre: [verifyToken],
-            },
-            handler: async (request, h) => {
-                const user = request.auth.credentials;
-                return h.response(user).code(200);
-            }
-        });
+
 
     },
 };

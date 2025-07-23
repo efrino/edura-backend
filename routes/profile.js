@@ -7,7 +7,7 @@ module.exports = {
     name: 'profile-routes',
     register: async function (server) {
         server.route([
-            // 🧑 GET /profile
+            // 🧑 GET /profile - Enhanced with student profile for class_id
             {
                 method: 'GET',
                 path: '/profile',
@@ -16,19 +16,67 @@ module.exports = {
                     tags: ['api', 'Profil'],
                 },
                 handler: async (req, h) => {
-                    const { id } = req.auth.credentials;
-                    const { data, error } = await db
-                        .from('users')
-                        .select('id, full_name, email, role, is_verified')
-                        .eq('id', id)
-                        .maybeSingle();
+                    const { id, role } = req.auth.credentials;
 
-                    if (error) {
-                        console.error('🔥 Error GET /profile', error);
+                    try {
+                        // Get basic user info
+                        const { data: user, error } = await db
+                            .from('users')
+                            .select('id, full_name, email, role, is_verified')
+                            .eq('id', id)
+                            .maybeSingle();
+
+                        if (error) throw error;
+                        if (!user) return h.response({ error: 'User not found' }).code(404);
+
+                        let profileData = { profile: user };
+
+                        // If user is student, get student profile with class info
+                        if (role === 'student') {
+                            const { data: studentProfile, error: studentError } = await db
+                                .from('student_profiles')
+                                .select(`
+                                    nim,
+                                    full_name,
+                                    jurusan,
+                                    program_studi,
+                                    perguruan_tinggi,
+                                    class_id,
+                                    created_at,
+                                    updated_at,
+                                    classes (
+                                        id,
+                                        name,
+                                        class_code
+                                    )
+                                `)
+                                .eq('user_id', id)
+                                .maybeSingle();
+
+                            if (!studentError && studentProfile) {
+                                profileData.profile.student_profile = {
+                                    nim: studentProfile.nim,
+                                    full_name: studentProfile.full_name,
+                                    jurusan: studentProfile.jurusan,
+                                    program_studi: studentProfile.program_studi,
+                                    perguruan_tinggi: studentProfile.perguruan_tinggi,
+                                    class_id: studentProfile.class_id,
+                                    kelas: studentProfile.classes?.name || null,
+                                    class_code: studentProfile.classes?.class_code || null,
+                                    created_at: studentProfile.created_at,
+                                    updated_at: studentProfile.updated_at
+                                };
+
+                                // Add class_id to main profile for easy access
+                                profileData.profile.class_id = studentProfile.class_id;
+                            }
+                        }
+
+                        return profileData;
+                    } catch (err) {
+                        console.error('🔥 Error GET /profile', err);
                         return h.response({ error: 'Failed to fetch profile' }).code(500);
                     }
-
-                    return { profile: data };
                 },
             },
 
@@ -81,6 +129,21 @@ module.exports = {
                         return h.response({ error: 'Failed to update profile' }).code(500);
                     }
                 },
+            },
+
+            // // === GET /me (profile)
+            {
+                method: 'GET',
+                path: '/me',
+                options: {
+                    tags: ['api', 'User'],
+                    description: 'Get current logged-in user',
+                    pre: [verifyToken],
+                },
+                handler: async (request, h) => {
+                    const user = request.auth.credentials;
+                    return h.response(user).code(200);
+                }
             },
 
             // ❌ DELETE /users/{id} → Hanya Admin

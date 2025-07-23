@@ -1,3 +1,4 @@
+// utils/middleware.js
 const jwt = require('jsonwebtoken');
 const Boom = require('@hapi/boom');
 const supabase = require('../db');
@@ -13,6 +14,9 @@ const PUBLIC_ROUTES = [
   '/verify-email',
   '/send-magic-link',
   '/',
+  '/public/class-code-info',
+  '/enums',
+  '/teacher-requests',
 ];
 
 async function verifyToken(request, h) {
