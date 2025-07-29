@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const { getEnv } = require('./env');
-const db = require('../db'); // ⬅️ WAJIB ADA
+const db = require('../db');
 
 let transporter = null;
 let defaultFrom = null;
@@ -309,7 +309,8 @@ async function sendPaymentStatusEmail(to, { userName, status, amount }) {
     await sendEmail({ to, subject: title + ' - Edura Platform', html });
 }
 
-async function sendTeacherRequestStatusEmail(to, status, fullName = '') {
+// UPDATED: sendTeacherRequestStatusEmail to accept setupLink parameter
+async function sendTeacherRequestStatusEmail(to, status, fullName = '', setupLink = null) {
     let title = '';
     let body = '';
     let backgroundColor = '#3b82f6';
@@ -335,6 +336,21 @@ async function sendTeacherRequestStatusEmail(to, status, fullName = '') {
     } else if (status === 'approved') {
         title = '🎉 Pengajuan Dosen Disetujui';
         backgroundColor = '#10b981';
+
+        // Include setup link in the email body when provided
+        const setupSection = setupLink ? `
+            <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0; color: #d97706; font-weight: 600;">🔐 Setup Password Anda</p>
+                <p style="margin: 0 0 12px 0; color: #d97706; font-size: 14px;">Sebelum mulai mengajar, Anda perlu mengatur password untuk akun Anda.</p>
+                <div style="text-align: center;">
+                    <a href="${setupLink}" class="button" style="background: linear-gradient(135deg, #f59e0b 0%, ${adjustBrightness('#f59e0b', -15)} 100%);">Setup Password</a>
+                </div>
+                <p style="margin: 12px 0 0 0; color: #d97706; font-size: 12px; font-style: italic;">Link ini akan kedaluwarsa dalam 24 jam</p>
+            </div>
+            <p>Atau salin link berikut jika tombol tidak berfungsi:</p>
+            <div class="code-block">${setupLink}</div>
+        ` : '';
+
         body = `
             <div style="text-align: center;">
                 <div class="icon">
@@ -346,21 +362,19 @@ async function sendTeacherRequestStatusEmail(to, status, fullName = '') {
             </div>
             <p>Selamat <strong>${displayName}</strong>!</p>
             <p>Pengajuan Anda sebagai dosen di <strong>Edura Platform</strong> telah <span class="highlight">disetujui</span>.</p>
+            ${setupSection}
             <div style="background-color: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0;">
-                <p style="margin: 0 0 8px 0; color: #059669; font-weight: 600;">🚀 Akun Dosen Anda Sudah Aktif!</p>
-                <p style="margin: 0; color: #059669; font-size: 14px;">Anda sekarang memiliki akses penuh ke fitur dosen di platform kami.</p>
+                <p style="margin: 0 0 8px 0; color: #059669; font-weight: 600;">🚀 Selamat Bergabung!</p>
+                <p style="margin: 0; color: #059669; font-size: 14px;">Setelah setup password, Anda dapat langsung mulai membuat course.</p>
             </div>
             <p>Fitur yang dapat Anda gunakan:</p>
             <ul style="color: #4b5563;">
-                <li>Membuat dan mengelola course</li>
-                <li>Upload materi pembelajaran</li>
-                <li>Mengelola siswa dan tugas</li>
-                <li>Analytics pembelajaran</li>
-                <li>Sertifikat course</li>
+                <li>Memverifikasi Course Student Anda</li>
+                <li>Sunting Materi Pembelajaran</li>
+                <li>Membuat Kelas</li>
+                <li>Mengelola Student dalam Kelas</li>
+                <li>Kirim Sertifikat dan Reminder</li>
             </ul>
-            <div style="text-align: center; margin: 24px 0;">
-                <a href="${await getEnv('FRONTEND_BASE_URL')}" class="button">Mulai Mengajar</a>
-            </div>
             <p>Selamat datang di keluarga besar <strong>Edura Platform</strong>! 🎓</p>
         `;
     } else if (status === 'rejected') {
@@ -390,7 +404,7 @@ async function sendTeacherRequestStatusEmail(to, status, fullName = '') {
     await sendEmail({ to, subject: title + ' - Edura Platform', html });
 }
 
-// 🆕 TAMBAHAN: Email konfirmasi pengajuan teacher request
+// Email konfirmasi pengajuan teacher request
 async function sendTeacherRequestConfirmationEmail(to, fullName) {
     const html = emailLayout({
         title: '📋 Konfirmasi Pengajuan Dosen',
@@ -410,6 +424,66 @@ async function sendTeacherRequestConfirmationEmail(to, fullName) {
     await sendEmail({ to, subject: 'Konfirmasi Pengajuan Dosen - Edura Platform', html });
 }
 
+// NEW: Send teacher password setup email (optional, if you want a dedicated function)
+async function sendTeacherPasswordSetupEmail(to, fullName, setupLink) {
+    const html = emailLayout({
+        title: '🔐 Setup Password Akun Dosen',
+        backgroundColor: '#7c3aed',
+        body: `
+            <p>Halo <strong>${fullName}</strong>!</p>
+            <p>Selamat! Pengajuan Anda sebagai dosen telah disetujui. Sekarang saatnya mengatur password untuk akun Anda.</p>
+            <div style="background-color: #f3e8ff; border: 1px solid #7c3aed; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 16px 0; color: #6b21a8; font-weight: 500;">Klik tombol di bawah untuk setup password:</p>
+                <a href="${setupLink}" class="button" style="background: linear-gradient(135deg, #7c3aed 0%, ${adjustBrightness('#7c3aed', -15)} 100%);">Setup Password Sekarang</a>
+            </div>
+            <p>Atau salin link berikut jika tombol tidak berfungsi:</p>
+            <div class="code-block">${setupLink}</div>
+            <p><span class="highlight">⏰ Link ini akan kedaluwarsa dalam 24 jam</span></p>
+            <div style="background-color: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0; color: #1e40af; font-weight: 500;">💡 Tips Password yang Kuat:</p>
+                <ul style="margin: 8px 0 0 0; color: #1e40af; font-size: 14px;">
+                    <li>Minimal 8 karakter</li>
+                    <li>Kombinasi huruf besar dan kecil</li>
+                    <li>Sertakan angka</li>
+                    <li>Tambahkan karakter khusus (!@#$%)</li>
+                </ul>
+            </div>
+            <p>Setelah setup password, Anda dapat langsung login dan mulai membuat course di Edura Platform.</p>
+            <p>Selamat bergabung dengan komunitas pengajar Edura! 🎓</p>
+        `
+    });
+
+    await sendEmail({ to, subject: '🔐 Setup Password Akun Dosen - Edura Platform', html });
+}
+async function sendNewUserCredentialsEmail({ to, fullName, email, password, role }) {
+    const frontendUrl = await getEnv('FRONTEND_BASE_URL');
+    const html = emailLayout({
+        title: 'Akun EduraApp Anda Telah Dibuat',
+        backgroundColor: '#7c3aed', // Warna ungu yang menarik
+        body: `
+            <p>Halo <strong>${fullName}</strong>!</p>
+            <p>Selamat datang di <strong>Edura Platform</strong>. Seorang admin telah membuatkan akun untuk Anda dengan detail sebagai berikut:</p>
+            <div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                <p style="margin: 0 0 12px 0;"><strong>Email:</strong> ${email}</p>
+                <p style="margin: 0 0 12px 0;"><strong>Password Sementara:</strong></p>
+                <div class="code-block" style="text-align: center; font-size: 16px; letter-spacing: 2px;">${password}</div>
+                <p style="margin: 12px 0 0 0;"><strong>Role:</strong> <span class="highlight">${role}</span></p>
+            </div>
+            <p>Kami sangat menyarankan Anda untuk segera login dan mengubah password Anda untuk keamanan.</p>
+            <div style="text-align: center; margin: 24px 0;">
+                <a href="${frontendUrl}" class="button">Login Sekarang</a>
+            </div>
+            <p>Selamat bergabung dan mulai berkontribusi di Edura Platform! 🚀</p>
+        `
+    });
+
+    await sendEmail({
+        to,
+        subject: 'Selamat Datang di Edura Platform!',
+        html
+    });
+}
+
 module.exports = {
     sendMagicLinkEmail,
     sendOtpEmail,
@@ -418,5 +492,7 @@ module.exports = {
     sendCertificateEmail,
     sendPaymentStatusEmail,
     sendTeacherRequestStatusEmail,
-    sendTeacherRequestConfirmationEmail
+    sendTeacherRequestConfirmationEmail,
+    sendTeacherPasswordSetupEmail,
+    sendNewUserCredentialsEmail
 };

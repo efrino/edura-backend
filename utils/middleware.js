@@ -16,7 +16,8 @@ const PUBLIC_ROUTES = [
   '/',
   '/public/class-code-info',
   '/enums',
-  '/teacher-requests',
+  '/setup-teacher-password',
+  '/resend-teacher-setup-link',
 ];
 
 async function verifyToken(request, h) {

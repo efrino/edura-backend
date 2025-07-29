@@ -9,6 +9,7 @@ module.exports = {
     version: '1.0.0',
     register: async function (server) {
         // ✅ GET: Ambil quiz siswa
+        // Di backend, update validasi GET /student/quiz untuk mengizinkan parameter tambahan
         server.route({
             method: 'GET',
             path: '/student/quiz',
@@ -20,7 +21,7 @@ module.exports = {
                     query: Joi.object({
                         course_id: Joi.string().required(),
                         session_number: Joi.number().min(1).max(16).required(),
-                    }),
+                    }).unknown(true), // Atau gunakan .unknown(true) untuk mengizinkan parameter tambahan
                 },
             },
             handler: async (req, h) => {
@@ -57,6 +58,7 @@ module.exports = {
                     payload: Joi.object({
                         course_id: Joi.string().required(),
                         session_number: Joi.number().min(1).max(16).required(),
+                        _t: Joi.number().optional(), // Tambahkan parameter ini untuk cache busting
                     }),
                 },
             },
@@ -125,8 +127,8 @@ Buatkan 5 soal pilihan ganda dalam format JSON:
 [
   {
     "question": "Apa itu ...?",
-    "options": ["A", "B", "C", "D"],
-    "answer": "A"
+    "options": ["string", "string", "string", "string"],
+    "answer": "string"
   },
   ...
 ]
@@ -190,6 +192,7 @@ Konten: ${session.content}
             },
         });
 
+        // REVISI ROUTE PUT /submit
         server.route({
             method: 'PUT',
             path: '/student/quiz/submit',
@@ -199,15 +202,20 @@ Konten: ${session.content}
                 pre: [verifyToken, requireRole('student')],
                 validate: {
                     payload: Joi.object({
-                        course_id: Joi.string().required(),
+                        course_id: Joi.string().uuid().required(),
                         session_number: Joi.number().min(1).max(16).required(),
-                        answers: Joi.array().items(
-                            Joi.object({
-                                question: Joi.string().required(),
-                                selected: Joi.string().required(),
-                            })
-                        ).min(1).required(),
-                        retry: Joi.boolean().optional().default(false),
+                        // Validasi kondisional: answers wajib jika retry=false
+                        answers: Joi.when('retry', {
+                            is: Joi.valid(true),
+                            then: Joi.array().items(Joi.object()).optional(), // Boleh kosong saat retry
+                            otherwise: Joi.array().items(
+                                Joi.object({
+                                    question: Joi.string().required(),
+                                    selected: Joi.string().allow('').required(),
+                                })
+                            ).min(1).required(),
+                        }),
+                        retry: Joi.boolean().default(false),
                     }),
                 },
             },
@@ -216,7 +224,6 @@ Konten: ${session.content}
                 const { course_id, session_number, answers, retry } = req.payload;
 
                 try {
-                    // Ambil quiz
                     const { data: quizData, error: quizErr } = await supabase
                         .from('student_quizzes')
                         .select('id, questions, status')
@@ -226,17 +233,16 @@ Konten: ${session.content}
                         .maybeSingle();
 
                     if (quizErr || !quizData) {
-                        console.error(quizErr);
-                        return Boom.notFound('Quiz not found');
+                        return Boom.notFound('Quiz not found for this student and session');
                     }
 
-                    // Handle retry
-                    if (quizData.status === 'submitted') {
-                        if (!retry) {
-                            return Boom.conflict('Quiz already submitted');
+                    // --- LOGIKA RETRY BARU ---
+                    if (retry) {
+                        if (quizData.status !== 'submitted') {
+                            return Boom.badRequest('Cannot retry a quiz that has not been submitted.');
                         }
 
-                        // Ambil ulang questions dari course_quizzes
+                        // Ambil bank soal dari course_quizzes
                         const { data: courseQuiz } = await supabase
                             .from('course_quizzes')
                             .select('questions')
@@ -244,57 +250,59 @@ Konten: ${session.content}
                             .eq('session_number', session_number)
                             .maybeSingle();
 
-                        if (!courseQuiz || !courseQuiz.questions) {
-                            return Boom.notFound('Course quiz not found for retry');
+                        if (!courseQuiz || !courseQuiz.questions || courseQuiz.questions.length === 0) {
+                            return Boom.notFound('Course quiz bank not found for retry.');
                         }
 
+                        // Acak ulang soal
                         const newQuestions = courseQuiz.questions
                             .sort(() => 0.5 - Math.random())
-                            .slice(0, 2); // Acak ulang
+                            .slice(0, 2); // Ambil 2 soal acak
 
-                        // Reset quiz student
+                        // Reset kuis mahasiswa
                         const { error: resetErr } = await supabase
                             .from('student_quizzes')
                             .update({
                                 questions: newQuestions,
                                 answers: null,
                                 score: null,
-                                status: 'done',
+                                status: 'done', // Status kembali ke 'done' (siap dikerjakan)
                                 updated_at: new Date().toISOString()
                             })
                             .eq('id', quizData.id);
 
                         if (resetErr) {
                             console.error('❌ Failed to reset quiz:', resetErr);
-                            return Boom.internal('Gagal reset quiz');
+                            return Boom.internal('Failed to reset quiz.');
                         }
 
+                        // **PENTING: Kembalikan soal baru ke frontend**
                         return h.response({
-                            message: '🔁 Quiz has been reset. Silakan kerjakan ulang.',
+                            message: 'Quiz has been reset. Please proceed.',
                             status: 'reset',
+                            data: {
+                                questions: newQuestions // Kirim soal baru
+                            }
                         });
                     }
 
-                    // Cek jawaban dan hitung skor
+                    // --- LOGIKA SUBMIT BIASA ---
+                    if (quizData.status === 'submitted') {
+                        return Boom.conflict('Quiz has already been submitted. Use retry=true to try again.');
+                    }
+
                     const correctQuestions = quizData.questions;
                     let correctCount = 0;
-
                     for (const studentAnswer of answers) {
-                        const q = correctQuestions.find(
-                            (item) => item.question === studentAnswer.question
-                        );
-                        if (
-                            q &&
-                            q.answer.trim().toLowerCase() === studentAnswer.selected.trim().toLowerCase()
-                        ) {
+                        const q = correctQuestions.find(item => item.question === studentAnswer.question);
+                        if (q && q.answer.trim().toLowerCase() === studentAnswer.selected.trim().toLowerCase()) {
                             correctCount++;
                         }
                     }
 
                     const total = correctQuestions.length;
-                    const score = Math.round((correctCount / total) * 100);
+                    const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
-                    // Simpan hasil submit
                     const { error: updateErr } = await supabase
                         .from('student_quizzes')
                         .update({
@@ -306,19 +314,17 @@ Konten: ${session.content}
                         .eq('id', quizData.id);
 
                     if (updateErr) {
-                        console.error(updateErr);
                         return Boom.internal('Failed to update quiz result');
                     }
 
                     return h.response({
                         message: '✅ Quiz submitted successfully',
-                        correct: correctCount,
-                        total,
-                        score,
+                        data: { correct: correctCount, total, score }
                     });
+
                 } catch (err) {
                     console.error('❌ Failed to submit quiz:', err);
-                    return Boom.internal('Failed to submit quiz');
+                    return Boom.internal('An unexpected error occurred while submitting the quiz.');
                 }
             }
         });
