@@ -159,6 +159,7 @@ module.exports = {
                     description: 'Update profil teacher',
                     validate: {
                         payload: Joi.object({
+                            nidn: Joi.string().optional(),
                             full_name: Joi.string().optional(),
                             fakultas: Joi.string().optional(),
                             program_studi: Joi.string().valid(...ENUM_PROGRAM_STUDI).optional(),

@@ -33,7 +33,8 @@ module.exports = {
                     program_studi,
                     is_verified,
                     is_generating,
-                    verified_by
+                    verified_by,
+                    created_at
                 )
             `)
                     .eq('student_id', studentId);
@@ -81,7 +82,8 @@ module.exports = {
                         checkpoint: item.checkpoint,
                         is_completed: item.is_completed,
                         total_sessions: totalSessions,
-                        percentage
+                        percentage,
+                        created_at: course.created_at,
                     };
                 });
 

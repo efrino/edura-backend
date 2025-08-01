@@ -5,7 +5,8 @@ const { hashToken } = require('../utils/hash');
 const {
     sendOtpEmail,
     sendMagicLinkEmail,
-    sendPasswordResetLink
+    sendPasswordResetLink,
+    sendTeacherPasswordSetupEmail
 } = require('../utils/email');
 const Joi = require('joi');
 const { v4: uuidv4 } = require('uuid');
@@ -410,9 +411,12 @@ module.exports = {
                             throw updateErr;
                         }
 
-                        // Send email with setup link
-                        const setupLink = `${process.env.FRONTEND_URL}/setup-teacher-password?token=${magicToken}`;
-                        // await sendTeacherPasswordSetupEmail(email, user.full_name, setupLink);
+                        // Generate setup link
+                        const frontendUrl = await getEnv('FRONTEND_BASE_URL');
+                        const setupLink = `${frontendUrl}#/setup-teacher-password?token=${magicToken}`;
+
+                        // Send email dengan setup link - PERBAIKAN: Hapus comment dan panggil fungsi
+                        await sendTeacherPasswordSetupEmail(email, user.full_name, setupLink);
 
                         console.log('✅ Teacher setup link resent to:', email);
 

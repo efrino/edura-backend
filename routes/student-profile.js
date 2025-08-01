@@ -73,7 +73,10 @@ module.exports = {
                             created_at,
                             updated_at,
                             classes (
-                              name
+                              name,
+                              teacher_id (
+                                full_name
+                        )
                             )
                         `)
                         .eq('user_id', userId)
@@ -90,6 +93,7 @@ module.exports = {
                         perguruan_tinggi: data.perguruan_tinggi,
                         class_id: data.class_id,
                         kelas: data.classes?.name ?? null,
+                        teacher: data.classes?.teacher_id?.full_name ?? null,
                         created_at: formatDate(data.created_at),
                         updated_at: formatDate(data.updated_at),
                     };
@@ -185,7 +189,8 @@ module.exports = {
                     }
                 }
             },
-            // === PUT /student/profile
+
+            // === PUT /student/profile ===
             {
                 method: 'PUT',
                 path: '/student/profile',
@@ -194,18 +199,12 @@ module.exports = {
                     pre: [verifyToken, requireRole('student')],
                     validate: {
                         payload: Joi.object({
+                            nim: Joi.string().optional(), // 🚀 FIX: nim juga harusnya bisa diupdate
                             full_name: Joi.string().optional(),
                             jurusan: Joi.string().optional(),
                             class_code: Joi.string().optional().allow('', null),
-                            // Program studi dan perguruan tinggi bisa diupdate manual jika tidak ada class
-                            program_studi: Joi.string()
-                                .valid(...ENUM_PROGRAM_STUDI)
-                                .optional()
-                                .allow(null),
-                            perguruan_tinggi: Joi.string()
-                                .valid(...ENUM_PERGURUAN_TINGGI)
-                                .optional()
-                                .allow(null),
+                            program_studi: Joi.string().valid(...ENUM_PROGRAM_STUDI).optional().allow(null),
+                            perguruan_tinggi: Joi.string().valid(...ENUM_PERGURUAN_TINGGI).optional().allow(null),
                         }),
                     },
                 },
@@ -213,7 +212,6 @@ module.exports = {
                     const userId = req.auth.credentials.id;
                     const { class_code, program_studi, perguruan_tinggi, ...updateData } = req.payload;
 
-                    // Get current profile to check if user has a class
                     const { data: currentProfile, error: fetchError } = await db
                         .from('student_profiles')
                         .select('class_id')
@@ -224,7 +222,6 @@ module.exports = {
                         return Boom.notFound('Profil tidak ditemukan');
                     }
 
-                    // If class_code is provided, handle joining a new class
                     if (class_code) {
                         const { data: kelas, error: classErr } = await db
                             .from('classes')
@@ -240,19 +237,16 @@ module.exports = {
                         updateData.program_studi = kelas.program_studi;
                         updateData.perguruan_tinggi = kelas.perguruan_tinggi;
                     } else {
-                        // If no class_code and user doesn't have a class, allow manual update
+                        // 🚀 FIX: Logika yang menyebabkan error dihapus.
+                        // Jika mahasiswa TIDAK di dalam kelas, izinkan pembaruan prodi & PT.
+                        // Jika SUDAH di dalam kelas, field prodi & PT dari payload akan diabaikan secara otomatis
+                        // karena tidak dimasukkan ke dalam `updateData`.
                         if (!currentProfile.class_id) {
                             if (program_studi) updateData.program_studi = program_studi;
                             if (perguruan_tinggi) updateData.perguruan_tinggi = perguruan_tinggi;
-                        } else {
-                            // User has a class but trying to update program_studi/perguruan_tinggi manually
-                            if (program_studi || perguruan_tinggi) {
-                                return Boom.badRequest('Tidak dapat mengubah program studi atau perguruan tinggi secara manual ketika sudah tergabung dalam kelas');
-                            }
                         }
                     }
 
-                    // Add updated_at timestamp
                     updateData.updated_at = new Date().toISOString();
 
                     const { error } = await db
@@ -260,7 +254,13 @@ module.exports = {
                         .update(updateData)
                         .eq('user_id', userId);
 
-                    if (error) throw error;
+                    if (error) {
+                        // Menangani kemungkinan duplikasi NIM
+                        if (error.code === '23505' && error.message.includes('student_profiles_nim_key')) {
+                            return Boom.conflict('NIM sudah digunakan oleh mahasiswa lain');
+                        }
+                        throw error;
+                    }
                     return { message: 'Profil berhasil diperbarui' };
                 },
             },
