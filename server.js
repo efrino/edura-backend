@@ -125,7 +125,8 @@ async function createServer() {
         host: '0.0.0.0',
         routes: {
             cors: {
-                origin: ['http://localhost:5173', 'http://localhost:5174','https://edura.web.id', 'https://edura-frontend.vercel.app','https://efrino.web.id','https://tc1c65ps-5174.asse.devtunnels.ms'],
+                // origin: ['http://localhost:5173', 'http://localhost:5174','https://edura.web.id', 'https://edura-frontend.vercel.app','https://efrino.web.id','https://tc1c65ps-5174.asse.devtunnels.ms'],
+                origin: ['*'], // Izinkan semua origin untuk pengembangan
             },
         },
     });
