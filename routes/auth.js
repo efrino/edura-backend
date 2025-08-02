@@ -112,7 +112,7 @@ module.exports = {
                 },
             },
 
-            // 🔐 POST /login (revised to handle teacher request pending)
+            // 🔐 POST /login (revised dengan better error handling)
             {
                 method: 'POST',
                 path: '/login',
@@ -184,7 +184,14 @@ module.exports = {
                                 magic_expires_at: magicExpires
                             }).eq('id', user.id);
 
-                            await sendMagicLinkEmail(email, magicToken);
+                            // Send magic link dengan error handling
+                            try {
+                                await sendMagicLinkEmail(email, magicToken);
+                            } catch (emailError) {
+                                console.error('❌ Failed to send magic link email:', emailError);
+                                // Continue without failing the whole request
+                            }
+
                             return h.response({
                                 error: 'Email not verified. We have sent a new verification link to your email.'
                             }).code(401);
@@ -202,10 +209,41 @@ module.exports = {
                         }).eq('id', user.id);
                         if (e2) throw new Error(e2.message);
 
-                        await sendOtpEmail(email, otp);
-                        return { message: 'OTP sent to your email' };
+                        // 🆕 Send OTP email dengan proper error handling
+                        try {
+                            await sendOtpEmail(email, otp);
+                            console.log('✅ OTP email sent successfully to:', email);
+                            return { message: 'OTP sent to your email' };
+                        } catch (emailError) {
+                            console.error('❌ Failed to send OTP email:', emailError);
+
+                            // Fallback: return OTP directly (ONLY for development)
+                            if (process.env.NODE_ENV === 'development') {
+                                console.warn('⚠️ Development mode: returning OTP directly');
+                                return {
+                                    message: 'Email service unavailable. OTP for development:',
+                                    otp: otp,
+                                    dev_mode: true
+                                };
+                            }
+
+                            // Production: generic error
+                            return h.response({
+                                error: 'Unable to send OTP. Please try again later.'
+                            }).code(500);
+                        }
+
                     } catch (err) {
                         console.error('🔥 Error /login', err);
+
+                        // Log more details about the error
+                        if (err.code) {
+                            console.error('Error code:', err.code);
+                        }
+                        if (err.cause) {
+                            console.error('Error cause:', err.cause);
+                        }
+
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },

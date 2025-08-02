@@ -5,7 +5,13 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "jobs": "node worker/generate-sessions-worker.js"
+    "jobs": "node worker/generate-sessions-worker.js",
+     "backup:test": "node scripts/test-backup.js",
+    "backup:status": "node scripts/backup-status.js",
+    "backup:trigger": "node scripts/trigger-backup.js",
+    "backup:cleanup": "node scripts/cleanup-old-logs.js",
+    "backup:check-routes": "node scripts/check-routes.js",
+    "backup:db-test": "node scripts/test-database.js"
   },
   "keywords": [],
   "engines": {
@@ -29,6 +35,7 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "midtrans-client": "^1.4.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
     "papaparse": "^5.5.3",
     "pg": "^8.16.0",

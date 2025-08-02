@@ -338,7 +338,8 @@ Konten: ${session.content}
                 validate: {
                     query: Joi.object({
                         course_id: Joi.string().required(),
-                        session_number: Joi.number().min(1).max(16).required()
+                        session_number: Joi.number().min(1).max(16).required(),
+                        _t: Joi.number().optional(), // Tambahkan parameter ini untuk cache busting
                     })
                 }
             },

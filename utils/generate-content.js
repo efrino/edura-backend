@@ -11,10 +11,11 @@ Tugasmu adalah membuat **materi pembelajaran yang lengkap, terstruktur, dan muda
 
 Tulis dengan format:
 <Materi:>
-<isi materi lengkap tanpa latihan, dengan struktur yang rapi dan penjelasan komprehensif>
-
-Hindari menambahkan bagian Latihan atau Pertanyaan di akhir. Fokus hanya pada konten pembelajaran.`;
-
+Isi materi lengkap, dengan struktur yang rapi dan penjelasan komprehensif.
+Hindari menambahkan bagian Latihan atau Pertanyaan di akhir. Fokus hanya pada konten pembelajaran.
+Berikan penjelasan yang mendalam, contoh konkret, dan referensi jika perlu.
+Pastikan konten sesuai dengan judul dan mudah dipahami oleh siswa.
+Jangan gunakan format lain selain yang sudah ditentukan. `;
     try {
         await loadActiveGeminiKey();
         const model = getNextModel();

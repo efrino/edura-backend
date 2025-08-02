@@ -20,7 +20,7 @@ module.exports = {
                         query: Joi.object({
                             search: Joi.string().allow('', null).optional(),
                             page: Joi.number().min(1).default(1),
-                            limit: Joi.number().min(1).max(1000).default(10), // Increased max limit
+                            limit: Joi.number().min(1).max(1000).default(10),
                             level: Joi.string().valid('beginner', 'intermediate', 'expert').optional(),
                             subject: Joi.string().optional(),
                             program_studi: Joi.string().optional()
@@ -135,7 +135,7 @@ module.exports = {
                 }
             },
 
-            // === PUT /admin/courses/{id}
+            // === PUT /admin/courses/{id} - FIXED VERSION
             {
                 method: 'PUT',
                 path: '/admin/courses/{id}',
@@ -177,13 +177,11 @@ module.exports = {
                             return Boom.notFound('Course tidak ditemukan');
                         }
 
-                        // Update course
+                        // FIXED: Removed updated_at since column doesn't exist in schema
+                        // Only update the payload data
                         const { error } = await db
                             .from('courses')
-                            .update({
-                                ...updateData,
-                                updated_at: new Date().toISOString()
-                            })
+                            .update(updateData)
                             .eq('id', id);
 
                         if (error) {
@@ -261,7 +259,7 @@ module.exports = {
                 },
                 handler: async (req, h) => {
                     try {
-                        // Get all courses for statistics (sesuai dengan schema yang ada)
+                        // Get all courses for statistics
                         const { data: courses, error } = await db
                             .from('courses')
                             .select('level, is_verified, created_at');

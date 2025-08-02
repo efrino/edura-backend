@@ -9,7 +9,7 @@ module.exports = {
     register: async function (server) {
         server.route({
             method: 'GET',
-            path: '/teacher/class/{id}/grades',
+            path: '/teacher/classes/{id}/grades',
             options: {
                 tags: ['api', 'Teacher'],
                 description: 'Ambil nilai siswa per kelas (kelompok per siswa)',

@@ -27,7 +27,17 @@ async function getTransporter() {
 
     return transporter;
 }
-
+// This is the main, reusable email sending function.
+async function sendEmail({ to, subject, html, attachments }) {
+    const mailer = await getTransporter();
+    await mailer.sendMail({
+        from: defaultFrom,
+        to,
+        subject,
+        html,
+        attachments
+    });
+}
 function emailLayout({ title, body, backgroundColor = '#1e90ff', textColor = '#333' }) {
     return `
     <!DOCTYPE html>
@@ -98,16 +108,6 @@ function adjustBrightness(hex, percent) {
         (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
 }
 
-async function sendEmail({ to, subject, html, attachments }) {
-    const mailer = await getTransporter();
-    await mailer.sendMail({
-        from: defaultFrom,
-        to,
-        subject,
-        html,
-        attachments
-    });
-}
 
 async function sendMagicLinkEmail(to, token) {
     const frontendUrl = await getEnv('FRONTEND_BASE_URL');
@@ -484,6 +484,121 @@ async function sendNewUserCredentialsEmail({ to, fullName, email, password, role
     });
 }
 
+async function sendLogBackupEmail(to, backupDetails, backupBuffer) {
+    const { filename, backupDate, logCount, adminName, backupType } = backupDetails;
+
+    const html = emailLayout({
+        title: '📦 Log Backup Otomatis - Edura Platform',
+        backgroundColor: '#6366f1',
+        body: `
+            <p>Halo <strong>${adminName}</strong>!</p>
+            <p>Backup log otomatis telah berhasil dilakukan untuk sistem <strong>Edura Platform</strong>.</p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <h4 style="margin: 0 0 12px 0; color: #1f2937;">📊 Detail Backup:</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
+                    <li><strong>Tanggal Log:</strong> ${backupDate}</li>
+                    <li><strong>Jumlah Log:</strong> ${logCount.toLocaleString()} entri</li>
+                    <li><strong>Nama File:</strong> ${filename}</li>
+                    <li><strong>Tipe Backup:</strong> ${backupType === 'daily' ? 'Harian Otomatis' : 'Manual'}</li>
+                    <li><strong>Waktu Backup:</strong> ${new Date().toLocaleString('id-ID')}</li>
+                </ul>
+            </div>
+
+            <div style="background-color: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0; color: #059669; font-weight: 500;">
+                    📎 File backup terlampir dalam email ini dan log telah dihapus dari database untuk menghemat ruang penyimpanan.
+                </p>
+            </div>
+
+            <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <h4 style="margin: 0 0 8px 0; color: #d97706;">⚠️ Penting:</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #d97706; font-size: 14px;">
+                    <li>Simpan file backup ini dengan aman</li>
+                    <li>Log telah dihapus dari database sistem</li>
+                    <li>Backup ini diperlukan untuk audit dan troubleshooting</li>
+                </ul>
+            </div>
+            <p>Terima kasih telah menjaga keamanan dan performa sistem! 🛡️</p>
+        `
+    });
+
+    // CORRECTED: Use the sendEmail helper function
+    await sendEmail({
+        to,
+        subject: `📦 Log Backup ${backupDate} - Edura Platform`,
+        html,
+        attachments: [{
+            filename: filename,
+            content: backupBuffer,
+            contentType: filename.endsWith('.json') ? 'application/json' : 'text/plain'
+        }]
+    });
+}
+
+async function sendBackupErrorEmail(to, error) {
+    const html = emailLayout({
+        title: '❌ Backup Error - Edura Platform',
+        backgroundColor: '#ef4444',
+        body: `
+            <p>Halo Admin!</p>
+            <p>Terjadi error pada proses backup otomatis sistem <strong>Edura Platform</strong>.</p>
+            
+            <div style="background-color: #fef2f2; border: 1px solid #ef4444; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <h4 style="margin: 0 0 12px 0; color: #dc2626;">Error Details:</h4>
+                <pre style="margin: 0; color: #dc2626; font-size: 14px; white-space: pre-wrap;">${error.message || 'Unknown error'}</pre>
+            </div>
+
+            <p>Silakan periksa sistem dan lakukan backup manual jika diperlukan.</p>
+            <p>Waktu error: ${new Date().toLocaleString('id-ID')}</p>
+        `
+    });
+
+    // CORRECTED: Use the sendEmail helper function
+    await sendEmail({
+        to,
+        subject: '❌ Backup Error - Edura Platform',
+        html
+    });
+}
+
+async function sendCleanupNotificationEmail(to, details) {
+    const { adminName, deletedCount, cutoffDate, retentionDays } = details;
+
+    const html = emailLayout({
+        title: '🧹 Cleanup Log Otomatis - Edura Platform',
+        backgroundColor: '#8b5cf6',
+        body: `
+            <p>Halo <strong>${adminName}</strong>!</p>
+            <p>Cleanup log otomatis telah berhasil dilakukan pada sistem <strong>Edura Platform</strong>.</p>
+            
+            <div style="background-color: #f3e8ff; border: 1px solid #8b5cf6; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <h4 style="margin: 0 0 12px 0; color: #7c3aed;">📊 Detail Cleanup:</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #7c3aed;">
+                    <li><strong>Log Dihapus:</strong> ${deletedCount.toLocaleString()} entri</li>
+                    <li><strong>Retensi:</strong> ${retentionDays} hari</li>
+                    <li><strong>Cutoff Date:</strong> ${new Date(cutoffDate).toLocaleDateString('id-ID')}</li>
+                    <li><strong>Waktu Cleanup:</strong> ${new Date().toLocaleString('id-ID')}</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0; color: #059669; font-weight: 500;">
+                    ✅ Log lama telah dibersihkan untuk mengoptimalkan performa database
+                </p>
+            </div>
+            <p>Cleanup otomatis berjalan setiap minggu untuk menjaga performa sistem.</p>
+        `
+    });
+
+    // CORRECTED: Use the sendEmail helper function
+    await sendEmail({
+        to,
+        subject: '🧹 Cleanup Log Completed - Edura Platform',
+        html
+    });
+}
+
 module.exports = {
     sendMagicLinkEmail,
     sendOtpEmail,
@@ -494,5 +609,8 @@ module.exports = {
     sendTeacherRequestStatusEmail,
     sendTeacherRequestConfirmationEmail,
     sendTeacherPasswordSetupEmail,
-    sendNewUserCredentialsEmail
+    sendNewUserCredentialsEmail,
+    sendLogBackupEmail,
+    sendBackupErrorEmail,
+    sendCleanupNotificationEmail
 };
