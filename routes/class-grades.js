@@ -29,7 +29,7 @@ module.exports = {
                     });
 
                     if (error) {
-                        console.error('❌ Failed to fetch grouped class grades:', error);
+                        //console.error('❌ Failed to fetch grouped class grades:', error);
                         return Boom.internal('Gagal mengambil data nilai kelas');
                     }
 
@@ -59,7 +59,7 @@ module.exports = {
 
                     return h.response(enrichedData);
                 } catch (err) {
-                    console.error('🔥 Unexpected error:', err);
+                    //console.error('🔥 Unexpected error:', err);
                     return Boom.internal('Terjadi kesalahan saat mengambil data nilai');
                 }
             },

@@ -9,7 +9,7 @@ async function logActivity({ user_id, role, action, detail }) {
             detail,
         });
     } catch (err) {
-        console.error('❌ Gagal menyimpan log ke Supabase:', err.message);
+        //console.error('❌ Gagal menyimpan log ke Supabase:', err.message);
     }
 }
 
@@ -21,7 +21,7 @@ async function getLogs(limit = 100) {
         .limit(limit);
 
     if (error) {
-        console.error('❌ Gagal mengambil log dari Supabase:', error.message);
+        //console.error('❌ Gagal mengambil log dari Supabase:', error.message);
         return [];
     }
 

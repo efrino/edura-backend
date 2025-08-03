@@ -184,7 +184,7 @@ async function sendStudentNotification(to, { studentName, message, course_id }) 
 
             if (data?.title) courseTitle = `"${data.title}"`;
         } catch (e) {
-            console.warn('⚠️ Gagal mengambil course title, fallback ke default.');
+            //console.warn('⚠️ Gagal mengambil course title, fallback ke default.');
         }
     }
 

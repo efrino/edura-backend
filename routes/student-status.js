@@ -34,7 +34,7 @@ module.exports = {
                     .single();
 
                 if (progressError || !progress) {
-                    console.error(progressError);
+                    //console.error(progressError);
                     throw Boom.notFound('Progress student tidak ditemukan');
                 }
 
@@ -45,7 +45,7 @@ module.exports = {
                     .eq('course_id', courseId);
 
                 if (sessionError) {
-                    console.error(sessionError);
+                    //console.error(sessionError);
                     throw Boom.internal('Gagal mengambil jumlah sesi');
                 }
 
@@ -61,7 +61,7 @@ module.exports = {
                     .maybeSingle();
 
                 if (examError) {
-                    console.error(examError);
+                    //console.error(examError);
                     throw Boom.internal('Gagal mengambil status final exam');
                 }
 

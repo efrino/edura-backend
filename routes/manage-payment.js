@@ -76,7 +76,7 @@ module.exports = {
                     const { data, count, error } = await query;
 
                     if (error) {
-                        console.error('❌ Error saat ambil data pembayaran:', error);
+                        //console.error('❌ Error saat ambil data pembayaran:', error);
                         throw Boom.internal('Gagal mengambil payment logs');
                     }
 
@@ -87,7 +87,7 @@ module.exports = {
                         totalPages: Math.ceil((count || 0) / limit),
                     }).code(200);
                 } catch (error) {
-                    console.error('Error in GET /admin/payments:', error);
+                    //console.error('Error in GET /admin/payments:', error);
                     if (error.isBoom) throw error;
                     throw Boom.internal('Failed to fetch payments');
                 }
@@ -111,7 +111,7 @@ module.exports = {
                         .select('status, amount, created_at');
 
                     if (error) {
-                        console.error('Error fetching payments for statistics:', error);
+                        //console.error('Error fetching payments for statistics:', error);
                         throw error;
                     }
 
@@ -140,7 +140,7 @@ module.exports = {
 
                     return h.response(stats).code(200);
                 } catch (error) {
-                    console.error('Error getting payment statistics:', error);
+                    //console.error('Error getting payment statistics:', error);
                     throw Boom.internal('Failed to get payment statistics');
                 }
             }
@@ -198,7 +198,7 @@ module.exports = {
                     const { data: payments, error } = await query;
 
                     if (error) {
-                        console.error('Error fetching payments for export:', error);
+                        //console.error('Error fetching payments for export:', error);
                         throw error;
                     }
 
@@ -227,7 +227,7 @@ module.exports = {
                         .type('text/csv')
                         .header('Content-Disposition', `attachment; filename=payments-${Date.now()}.csv`);
                 } catch (error) {
-                    console.error('Error exporting payments:', error);
+                    //console.error('Error exporting payments:', error);
                     throw Boom.internal('Failed to export payments');
                 }
             }
@@ -258,7 +258,7 @@ module.exports = {
                         .maybeSingle();
 
                     if (error) {
-                        console.error('Error fetching payment detail:', error);
+                        //console.error('Error fetching payment detail:', error);
                         throw error;
                     }
 
@@ -268,7 +268,7 @@ module.exports = {
 
                     return h.response(data).code(200);
                 } catch (error) {
-                    console.error('Error in GET /admin/payments/{id}:', error);
+                    //console.error('Error in GET /admin/payments/{id}:', error);
                     if (error.isBoom) throw error;
                     throw Boom.internal('Failed to fetch payment detail');
                 }
@@ -301,7 +301,7 @@ module.exports = {
                         .maybeSingle();
 
                     if (checkError) {
-                        console.error('Error checking payment:', checkError);
+                        //console.error('Error checking payment:', checkError);
                         throw checkError;
                     }
 
@@ -316,7 +316,7 @@ module.exports = {
                         .eq('id', id);
 
                     if (error) {
-                        console.error('Error deleting payment:', error);
+                        //console.error('Error deleting payment:', error);
                         throw error;
                     }
 
@@ -329,7 +329,7 @@ module.exports = {
                         }
                     }).code(200);
                 } catch (error) {
-                    console.error('Error in DELETE /admin/payments/{id}:', error);
+                    //console.error('Error in DELETE /admin/payments/{id}:', error);
                     if (error.isBoom) throw error;
                     throw Boom.internal('Failed to delete payment');
                 }
@@ -367,7 +367,7 @@ module.exports = {
                         .maybeSingle();
 
                     if (checkError) {
-                        console.error('Error checking payment:', checkError);
+                        //console.error('Error checking payment:', checkError);
                         throw checkError;
                     }
 
@@ -391,7 +391,7 @@ module.exports = {
                         .eq('id', id);
 
                     if (error) {
-                        console.error('Error updating payment status:', error);
+                        //console.error('Error updating payment status:', error);
                         throw error;
                     }
 
@@ -400,7 +400,7 @@ module.exports = {
                         status: status
                     }).code(200);
                 } catch (error) {
-                    console.error('Error in PUT /admin/payments/{id}/status:', error);
+                    //console.error('Error in PUT /admin/payments/{id}/status:', error);
                     if (error.isBoom) throw error;
                     throw Boom.internal('Failed to update payment status');
                 }

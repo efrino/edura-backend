@@ -18,7 +18,7 @@ module.exports = {
                 },
                 handler: async (request, h) => {
                     try {
-                        console.log('🔧 [MANUAL_TRIGGER] Daily backup triggered by admin:', request.auth.credentials.full_name);
+                        //console.log('🔧 [MANUAL_TRIGGER] Daily backup triggered by admin:', request.auth.credentials.full_name);
 
                         const result = await runDailyBackup();
 
@@ -40,7 +40,7 @@ module.exports = {
                         }).code(200);
 
                     } catch (error) {
-                        console.error('❌ [MANUAL_TRIGGER] Daily backup error:', error);
+                        //console.error('❌ [MANUAL_TRIGGER] Daily backup error:', error);
                         return h.response({
                             error: 'Backup gagal',
                             message: error.message
@@ -60,7 +60,7 @@ module.exports = {
                 },
                 handler: async (request, h) => {
                     try {
-                        console.log('🔧 [MANUAL_TRIGGER] Weekly cleanup triggered by admin:', request.auth.credentials.full_name);
+                        //console.log('🔧 [MANUAL_TRIGGER] Weekly cleanup triggered by admin:', request.auth.credentials.full_name);
 
                         const result = await runWeeklyCleanup();
 
@@ -81,7 +81,7 @@ module.exports = {
                         }).code(200);
 
                     } catch (error) {
-                        console.error('❌ [MANUAL_TRIGGER] Weekly cleanup error:', error);
+                        //console.error('❌ [MANUAL_TRIGGER] Weekly cleanup error:', error);
                         return h.response({
                             error: 'Cleanup gagal',
                             message: error.message
@@ -129,7 +129,7 @@ module.exports = {
                         };
 
                     } catch (error) {
-                        console.error('❌ [STATUS_CHECK] Error getting backup status:', error);
+                        //console.error('❌ [STATUS_CHECK] Error getting backup status:', error);
                         return h.response({
                             error: 'Gagal mengambil status backup',
                             message: error.message

@@ -131,7 +131,7 @@ module.exports = {
 
                     return { message: 'Notifikasi berhasil dikirim' };
                 } catch (err) {
-                    console.error(err);
+                    //console.error(err);
                     return Boom.internal('Gagal kirim email');
                 }
             }
@@ -229,7 +229,7 @@ module.exports = {
                         });
                         sent++;
                     } catch (e) {
-                        console.error(`Gagal kirim ke ${s.name}:`, e.message);
+                        //console.error(`Gagal kirim ke ${s.name}:`, e.message);
                     }
                 }
 

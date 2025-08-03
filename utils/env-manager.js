@@ -23,7 +23,7 @@ function reloadEnv() {
     for (const [key, value] of Object.entries(parsed)) {
         process.env[key] = value;
     }
-    console.log('[ENV] process.env diperbarui ulang dari file .env');
+    //console.log('[ENV] process.env diperbarui ulang dari file .env');
 }
 
 module.exports = { readEnv, writeEnv, reloadEnv };

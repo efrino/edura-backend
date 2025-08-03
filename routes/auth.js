@@ -64,7 +64,7 @@ module.exports = {
 
                         return h.response({ message: 'Registration successful. Please check your email to verify your account.' }).code(201);
                     } catch (err) {
-                        console.error('🔥 Error /register', err);
+                        //console.error('🔥 Error /register', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },
@@ -106,7 +106,7 @@ module.exports = {
 
                         return h.response({ message: 'Email verified successfully!' });
                     } catch (err) {
-                        console.error('🔥 Error /verify-email', err);
+                        //console.error('🔥 Error /verify-email', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },
@@ -188,7 +188,7 @@ module.exports = {
                             try {
                                 await sendMagicLinkEmail(email, magicToken);
                             } catch (emailError) {
-                                console.error('❌ Failed to send magic link email:', emailError);
+                                //console.error('❌ Failed to send magic link email:', emailError);
                                 // Continue without failing the whole request
                             }
 
@@ -212,14 +212,14 @@ module.exports = {
                         // 🆕 Send OTP email dengan proper error handling
                         try {
                             await sendOtpEmail(email, otp);
-                            console.log('✅ OTP email sent successfully to:', email);
+                            //console.log('✅ OTP email sent successfully to:', email);
                             return { message: 'OTP sent to your email' };
                         } catch (emailError) {
-                            console.error('❌ Failed to send OTP email:', emailError);
+                            //console.error('❌ Failed to send OTP email:', emailError);
 
                             // Fallback: return OTP directly (ONLY for development)
                             if (process.env.NODE_ENV === 'development') {
-                                console.warn('⚠️ Development mode: returning OTP directly');
+                                //console.warn('⚠️ Development mode: returning OTP directly');
                                 return {
                                     message: 'Email service unavailable. OTP for development:',
                                     otp: otp,
@@ -234,14 +234,14 @@ module.exports = {
                         }
 
                     } catch (err) {
-                        console.error('🔥 Error /login', err);
+                        //console.error('🔥 Error /login', err);
 
                         // Log more details about the error
                         if (err.code) {
-                            console.error('Error code:', err.code);
+                            //console.error('Error code:', err.code);
                         }
                         if (err.cause) {
-                            console.error('Error cause:', err.cause);
+                            //console.error('Error cause:', err.cause);
                         }
 
                         return h.response({ error: 'Internal Server Error' }).code(500);
@@ -287,7 +287,7 @@ module.exports = {
                         await sendMagicLinkEmail(email, magicToken);
                         return { message: 'Magic link resent to email' };
                     } catch (err) {
-                        console.error('🔥 Error /send-magic-link', err);
+                        //console.error('🔥 Error /send-magic-link', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },
@@ -321,7 +321,7 @@ module.exports = {
                             .maybeSingle();
 
                         if (error) {
-                            console.error('Error finding user:', error);
+                            //console.error('Error finding user:', error);
                             throw error;
                         }
 
@@ -360,7 +360,7 @@ module.exports = {
                             .eq('id', user.id);
 
                         if (updateErr) {
-                            console.error('Error updating password:', updateErr);
+                            //console.error('Error updating password:', updateErr);
                             return h.response({ error: 'Gagal setup password' }).code(500);
                         }
 
@@ -376,7 +376,7 @@ module.exports = {
                             { expiresIn: '7d' }
                         );
 
-                        console.log('✅ Teacher password setup successful for:', user.email);
+                        //console.log('✅ Teacher password setup successful for:', user.email);
 
                         return h.response({
                             message: 'Password berhasil diatur. Anda sekarang dapat login sebagai teacher.',
@@ -389,7 +389,7 @@ module.exports = {
                         });
 
                     } catch (err) {
-                        console.error('🔥 Error /setup-teacher-password', err);
+                        //console.error('🔥 Error /setup-teacher-password', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 }
@@ -456,14 +456,14 @@ module.exports = {
                         // Send email dengan setup link - PERBAIKAN: Hapus comment dan panggil fungsi
                         await sendTeacherPasswordSetupEmail(email, user.full_name, setupLink);
 
-                        console.log('✅ Teacher setup link resent to:', email);
+                        //console.log('✅ Teacher setup link resent to:', email);
 
                         return h.response({
                             message: 'Link setup password telah dikirim ke email Anda.'
                         });
 
                     } catch (err) {
-                        console.error('🔥 Error /resend-teacher-setup-link', err);
+                        //console.error('🔥 Error /resend-teacher-setup-link', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 }
@@ -491,13 +491,13 @@ module.exports = {
                             .maybeSingle();
 
                         if (error) {
-                            console.error('❌ [Forgot Password] Supabase error:', error.message);
+                            //console.error('❌ [Forgot Password] Supabase error:', error.message);
                             throw error;
                         }
 
                         // Tetap response netral untuk keamanan
                         if (!user) {
-                            console.warn('⚠️ [Forgot Password] Email tidak ditemukan:', email);
+                            //console.warn('⚠️ [Forgot Password] Email tidak ditemukan:', email);
                             return { message: 'If this email is registered, a reset link has been sent.' };
                         }
 
@@ -520,11 +520,11 @@ module.exports = {
 
                         await sendPasswordResetLink(email, token);
 
-                        console.log('📧 [Forgot Password] Reset link sent to:', email);
+                        //console.log('📧 [Forgot Password] Reset link sent to:', email);
 
                         return { message: 'If this email is registered, a reset link has been sent.' };
                     } catch (err) {
-                        console.error('🔥 [Forgot Password] Internal error:', err);
+                        //console.error('🔥 [Forgot Password] Internal error:', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 }
@@ -547,8 +547,8 @@ module.exports = {
                     const hashedToken = hashToken(token);
 
                     // 🧾 Log input token & hashed token
-                    console.log('🔑 [Reset Password] Token (plain):', token);
-                    console.log('🔒 [Reset Password] Token (hashed):', hashedToken);
+                    //console.log('🔑 [Reset Password] Token (plain):', token);
+                    //console.log('🔒 [Reset Password] Token (hashed):', hashedToken);
 
                     try {
                         const { data: user, error } = await db
@@ -559,30 +559,30 @@ module.exports = {
 
                         // 🧾 Log hasil query ke Supabase
                         if (error) {
-                            console.error('❌ [Reset Password] Supabase error:', error.message);
+                            //console.error('❌ [Reset Password] Supabase error:', error.message);
                             throw error;
                         }
 
                         if (!user) {
-                            console.warn('⚠️ [Reset Password] Token tidak cocok dengan user manapun');
+                            //console.warn('⚠️ [Reset Password] Token tidak cocok dengan user manapun');
                             return h.response({ error: 'Invalid or expired token' }).code(401);
                         }
 
-                        console.log('✅ [Reset Password] User ditemukan:', user.email || user.id);
+                        //console.log('✅ [Reset Password] User ditemukan:', user.email || user.id);
 
                         if (!user.reset_expires_at) {
-                            console.warn('⚠️ [Reset Password] Tidak ada field reset_expires_at');
+                            //console.warn('⚠️ [Reset Password] Tidak ada field reset_expires_at');
                             return h.response({ error: 'Invalid or expired token' }).code(401);
                         }
 
                         const now = Date.now();
                         const expiresAt = new Date(user.reset_expires_at).getTime();
 
-                        console.log('🕒 [Reset Password] Sekarang:', new Date(now).toISOString());
-                        console.log('🕓 [Reset Password] Expired At:', new Date(expiresAt).toISOString());
+                        //console.log('🕒 [Reset Password] Sekarang:', new Date(now).toISOString());
+                        //console.log('🕓 [Reset Password] Expired At:', new Date(expiresAt).toISOString());
 
                         if (now > expiresAt) {
-                            console.warn('⚠️ [Reset Password] Token sudah expired');
+                            //console.warn('⚠️ [Reset Password] Token sudah expired');
                             return h.response({ error: 'Invalid or expired token' }).code(401);
                         }
 
@@ -594,12 +594,12 @@ module.exports = {
                             reset_expires_at: null
                         }).eq('id', user.id);
 
-                        console.log('✅ [Reset Password] Password berhasil direset untuk:', user.email || user.id);
+                        //console.log('✅ [Reset Password] Password berhasil direset untuk:', user.email || user.id);
 
                         return { message: 'Password has been reset successfully' };
 
                     } catch (err) {
-                        console.error('🔥 Error /reset-password', err);
+                        //console.error('🔥 Error /reset-password', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 }
@@ -662,7 +662,7 @@ module.exports = {
                             role: user.role
                         };
                     } catch (err) {
-                        console.error('🔥 Error /verify-otp', err);
+                        //console.error('🔥 Error /verify-otp', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },
@@ -711,7 +711,7 @@ module.exports = {
                         await sendOtpEmail(email, otp);
                         return { message: 'New OTP sent to your email' };
                     } catch (err) {
-                        console.error('🔥 Error /resend-otp', err);
+                        //console.error('🔥 Error /resend-otp', err);
                         return h.response({ error: 'Internal Server Error' }).code(500);
                     }
                 },

@@ -32,7 +32,7 @@ module.exports = {
                     .maybeSingle();
 
                 if (courseError || !course) {
-                    console.error(courseError);
+                    //console.error(courseError);
                     return Boom.notFound('Course tidak ditemukan');
                 }
 
@@ -44,7 +44,7 @@ module.exports = {
                     .order('session_number', { ascending: true });
 
                 if (sessionError) {
-                    console.error(sessionError);
+                    //console.error(sessionError);
                     return Boom.internal('Gagal mengambil sesi kursus');
                 }
 
@@ -57,7 +57,7 @@ module.exports = {
                     .maybeSingle();
 
                 if (progressError || !progress) {
-                    console.error(progressError);
+                    //console.error(progressError);
                     return Boom.notFound('Data student_course tidak ditemukan');
                 }
 

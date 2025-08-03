@@ -12,17 +12,17 @@ class BackupScheduler {
 
     async start() {
         if (this.isRunning) {
-            console.log('⚠️ [BACKUP_SCHEDULER] Already running');
+            //console.log('⚠️ [BACKUP_SCHEDULER] Already running');
             return;
         }
 
         try {
-            console.log('🚀 [BACKUP_SCHEDULER] Starting backup scheduler...');
+            //console.log('🚀 [BACKUP_SCHEDULER] Starting backup scheduler...');
 
             // Check if backup is enabled
             const backupEnabled = await this.getEnvValue('BACKUP_ENABLED', 'true');
             if (backupEnabled !== 'true') {
-                console.log('⚠️ [BACKUP_SCHEDULER] Backup disabled, scheduler not started');
+                //console.log('⚠️ [BACKUP_SCHEDULER] Backup disabled, scheduler not started');
                 return;
             }
 
@@ -58,42 +58,42 @@ class BackupScheduler {
             // Start all jobs
             this.jobs.forEach((job, name) => {
                 job.start();
-                console.log(`✅ [BACKUP_SCHEDULER] Started job: ${name}`);
+                //console.log(`✅ [BACKUP_SCHEDULER] Started job: ${name}`);
             });
 
             this.isRunning = true;
 
-            console.log('✅ [BACKUP_SCHEDULER] Backup scheduler started successfully');
-            console.log(`📅 Daily backup: Every day at ${backupTime} WIB`);
-            console.log(`🧹 Weekly cleanup: Every Sunday at ${cleanupTime} WIB`);
+            //console.log('✅ [BACKUP_SCHEDULER] Backup scheduler started successfully');
+            //console.log(`📅 Daily backup: Every day at ${backupTime} WIB`);
+            //console.log(`🧹 Weekly cleanup: Every Sunday at ${cleanupTime} WIB`);
 
         } catch (error) {
-            console.error('❌ [BACKUP_SCHEDULER] Failed to start scheduler:', error);
+            //console.error('❌ [BACKUP_SCHEDULER] Failed to start scheduler:', error);
             throw error;
         }
     }
 
     stop() {
         if (!this.isRunning) {
-            console.log('⚠️ [BACKUP_SCHEDULER] Already stopped');
+            //console.log('⚠️ [BACKUP_SCHEDULER] Already stopped');
             return;
         }
 
-        console.log('🛑 [BACKUP_SCHEDULER] Stopping backup scheduler...');
+        //console.log('🛑 [BACKUP_SCHEDULER] Stopping backup scheduler...');
 
         this.jobs.forEach((job, name) => {
             job.destroy();
-            console.log(`✅ [BACKUP_SCHEDULER] Stopped job: ${name}`);
+            //console.log(`✅ [BACKUP_SCHEDULER] Stopped job: ${name}`);
         });
 
         this.jobs.clear();
         this.isRunning = false;
 
-        console.log('✅ [BACKUP_SCHEDULER] Backup scheduler stopped');
+        //console.log('✅ [BACKUP_SCHEDULER] Backup scheduler stopped');
     }
 
     async restart() {
-        console.log('🔄 [BACKUP_SCHEDULER] Restarting backup scheduler...');
+        //console.log('🔄 [BACKUP_SCHEDULER] Restarting backup scheduler...');
         this.stop();
         await this.start();
     }
@@ -102,35 +102,35 @@ class BackupScheduler {
 
     async runDailyBackupJob() {
         try {
-            console.log(`🕐 [SCHEDULED_BACKUP] Daily backup started at ${new Date().toLocaleString('id-ID')}`);
+            //console.log(`🕐 [SCHEDULED_BACKUP] Daily backup started at ${new Date().toLocaleString('id-ID')}`);
 
             const result = await runDailyBackup();
 
             if (result.skipped) {
-                console.log(`ℹ️ [SCHEDULED_BACKUP] Daily backup skipped: ${result.reason}`);
+                //console.log(`ℹ️ [SCHEDULED_BACKUP] Daily backup skipped: ${result.reason}`);
             } else {
-                console.log(`✅ [SCHEDULED_BACKUP] Daily backup completed successfully`);
+                //console.log(`✅ [SCHEDULED_BACKUP] Daily backup completed successfully`);
             }
 
         } catch (error) {
-            console.error('❌ [SCHEDULED_BACKUP] Daily backup failed:', error);
+            //console.error('❌ [SCHEDULED_BACKUP] Daily backup failed:', error);
         }
     }
 
     async runWeeklyCleanupJob() {
         try {
-            console.log(`🕐 [SCHEDULED_CLEANUP] Weekly cleanup started at ${new Date().toLocaleString('id-ID')}`);
+            //console.log(`🕐 [SCHEDULED_CLEANUP] Weekly cleanup started at ${new Date().toLocaleString('id-ID')}`);
 
             const result = await runWeeklyCleanup();
 
             if (result.skipped) {
-                console.log(`ℹ️ [SCHEDULED_CLEANUP] Weekly cleanup skipped: ${result.reason}`);
+                //console.log(`ℹ️ [SCHEDULED_CLEANUP] Weekly cleanup skipped: ${result.reason}`);
             } else {
-                console.log(`✅ [SCHEDULED_CLEANUP] Weekly cleanup completed successfully`);
+                //console.log(`✅ [SCHEDULED_CLEANUP] Weekly cleanup completed successfully`);
             }
 
         } catch (error) {
-            console.error('❌ [SCHEDULED_CLEANUP] Weekly cleanup failed:', error);
+            //console.error('❌ [SCHEDULED_CLEANUP] Weekly cleanup failed:', error);
         }
     }
 
@@ -158,7 +158,7 @@ class BackupScheduler {
             const value = await getEnv(key);
             return value.replace(/^"(.*)"$/, '$1'); // Remove quotes if present
         } catch (error) {
-            console.warn(`[BACKUP_SCHEDULER] Environment variable ${key} not found, using default:`, defaultValue);
+            //console.warn(`[BACKUP_SCHEDULER] Environment variable ${key} not found, using default:`, defaultValue);
             return defaultValue;
         }
     }
@@ -221,12 +221,12 @@ class BackupScheduler {
     // === Manual Trigger Methods ===
 
     async triggerDailyBackup() {
-        console.log('🔧 [BACKUP_SCHEDULER] Manually triggering daily backup...');
+        //console.log('🔧 [BACKUP_SCHEDULER] Manually triggering daily backup...');
         await this.runDailyBackupJob();
     }
 
     async triggerWeeklyCleanup() {
-        console.log('🔧 [BACKUP_SCHEDULER] Manually triggering weekly cleanup...');
+        //console.log('🔧 [BACKUP_SCHEDULER] Manually triggering weekly cleanup...');
         await this.runWeeklyCleanupJob();
     }
 }

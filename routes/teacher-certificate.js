@@ -85,7 +85,7 @@ module.exports = {
 
                     return h.response({ message: '✅ Sertifikat berhasil dikirim ke email siswa.' });
                 } catch (err) {
-                    console.error('🔥 Gagal membuat/kirim sertifikat:', err);
+                    //console.error('🔥 Gagal membuat/kirim sertifikat:', err);
                     return Boom.internal('Gagal membuat atau mengirim sertifikat');
                 }
             }

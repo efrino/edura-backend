@@ -74,7 +74,7 @@ module.exports = {
                         redirect_url: response.redirect_url,
                     }).code(200);
                 } catch (err) {
-                    console.error('Midtrans error:', err);
+                    //console.error('Midtrans error:', err);
                     return h.response({ message: 'Gagal membuat transaksi' }).code(500);
                 }
             },
@@ -105,7 +105,7 @@ module.exports = {
                     .maybeSingle();
 
                 if (logErr || !log) {
-                    console.error('❌ Log tidak ditemukan untuk order:', orderId);
+                    //console.error('❌ Log tidak ditemukan untuk order:', orderId);
                     return h.response().code(200); // tetap 200 agar Midtrans tidak retry terus
                 }
 
@@ -125,9 +125,9 @@ module.exports = {
                         .eq('id', userId);
 
                     if (updateErr) {
-                        console.error('❌ Gagal update plan user:', updateErr);
+                        //console.error('❌ Gagal update plan user:', updateErr);
                     } else {
-                        console.log('✅ Plan premium berhasil diperpanjang untuk user:', userId);
+                        //console.log('✅ Plan premium berhasil diperpanjang untuk user:', userId);
 
                         // 📩 Kirim email konfirmasi ke user
                         const { data: userInfo, error: userInfoErr } = await supabase
@@ -143,9 +143,9 @@ module.exports = {
                                     status,
                                     amount: body.gross_amount || 50000,
                                 });
-                                console.log(`📧 Email pembayaran dikirim ke ${userInfo.email}`);
+                                //console.log(`📧 Email pembayaran dikirim ke ${userInfo.email}`);
                             } catch (err) {
-                                console.error('❌ Gagal kirim email pembayaran:', err.message);
+                                //console.error('❌ Gagal kirim email pembayaran:', err.message);
                             }
                         }
                     }
@@ -217,7 +217,7 @@ module.exports = {
                     }).code(200);
 
                 } catch (err) {
-                    console.error('❌ Gagal cek status:', err);
+                    //console.error('❌ Gagal cek status:', err);
                     return h.response({ message: 'Gagal mendapatkan status transaksi' }).code(500);
                 }
             },

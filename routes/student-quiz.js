@@ -37,7 +37,7 @@ module.exports = {
                     .maybeSingle();
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return Boom.internal('Failed to fetch student quiz');
                 }
 
@@ -164,7 +164,7 @@ Konten: ${session.content}
                                 .update({ status: 'failed', updated_at: new Date().toISOString() })
                                 .match({ student_id, course_id, session_number });
 
-                            console.error(`❌ Failed to parse or save AI quiz:`, e.message);
+                            //console.error(`❌ Failed to parse or save AI quiz:`, e.message);
                             throw Boom.badData('Quiz generation failed, try again later');
                         }
                     }
@@ -186,7 +186,7 @@ Konten: ${session.content}
                         total_questions: randomized.length,
                     });
                 } catch (err) {
-                    console.error('🔥 Error generating student quiz:', err);
+                    //console.error('🔥 Error generating student quiz:', err);
                     return Boom.internal('Failed to generate quiz');
                 }
             },
@@ -272,7 +272,7 @@ Konten: ${session.content}
                             .eq('id', quizData.id);
 
                         if (resetErr) {
-                            console.error('❌ Failed to reset quiz:', resetErr);
+                            //console.error('❌ Failed to reset quiz:', resetErr);
                             return Boom.internal('Failed to reset quiz.');
                         }
 
@@ -323,7 +323,7 @@ Konten: ${session.content}
                     });
 
                 } catch (err) {
-                    console.error('❌ Failed to submit quiz:', err);
+                    //console.error('❌ Failed to submit quiz:', err);
                     return Boom.internal('An unexpected error occurred while submitting the quiz.');
                 }
             }
@@ -357,7 +357,7 @@ Konten: ${session.content}
                         .maybeSingle();
 
                     if (error || !quiz) {
-                        console.error(error);
+                        //console.error(error);
                         return Boom.notFound('Quiz result not found');
                     }
 
@@ -373,7 +373,7 @@ Konten: ${session.content}
                         }
                     });
                 } catch (err) {
-                    console.error('❌ Error fetching quiz result:', err);
+                    //console.error('❌ Error fetching quiz result:', err);
                     return Boom.internal('Failed to fetch quiz result');
                 }
             }

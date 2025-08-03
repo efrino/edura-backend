@@ -12,7 +12,7 @@ class LogBackupWorker {
 
     async performDailyBackup() {
         try {
-            console.log('📦 [BACKUP_WORKER] Starting daily log backup...');
+            //console.log('📦 [BACKUP_WORKER] Starting daily log backup...');
 
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
@@ -21,14 +21,14 @@ class LogBackupWorker {
             // Check if backup is enabled
             const backupEnabled = await this.getEnvValue('BACKUP_ENABLED');
             if (backupEnabled !== 'true') {
-                console.log('⚠️ [BACKUP_WORKER] Backup disabled, skipping...');
+                //console.log('⚠️ [BACKUP_WORKER] Backup disabled, skipping...');
                 return { skipped: true, reason: 'Backup disabled' };
             }
 
             // Get admin emails for notification
             const adminEmails = await this.getAdminEmails();
             if (adminEmails.length === 0) {
-                console.warn('⚠️ [BACKUP_WORKER] No admin emails found for backup notification');
+                //console.warn('⚠️ [BACKUP_WORKER] No admin emails found for backup notification');
                 return { skipped: true, reason: 'No admin emails configured' };
             }
 
@@ -49,12 +49,12 @@ class LogBackupWorker {
                 .order('created_at', { ascending: false });
 
             if (error) {
-                console.error('❌ [BACKUP_WORKER] Error fetching logs for backup:', error);
+                //console.error('❌ [BACKUP_WORKER] Error fetching logs for backup:', error);
                 throw new Error('Failed to fetch logs for backup');
             }
 
             if (!logs || logs.length === 0) {
-                console.log(`ℹ️ [BACKUP_WORKER] No logs found for ${backupDate}, skipping backup`);
+                //console.log(`ℹ️ [BACKUP_WORKER] No logs found for ${backupDate}, skipping backup`);
                 return { skipped: true, reason: 'No logs found' };
             }
 
@@ -97,7 +97,7 @@ class LogBackupWorker {
                     }, backupBuffer);
                     return { email: adminEmail.email, success: true };
                 } catch (emailError) {
-                    console.error(`❌ [BACKUP_WORKER] Failed to send backup email to ${adminEmail.email}:`, emailError);
+                    //console.error(`❌ [BACKUP_WORKER] Failed to send backup email to ${adminEmail.email}:`, emailError);
                     return { email: adminEmail.email, success: false, error: emailError.message };
                 }
             });
@@ -119,7 +119,7 @@ class LogBackupWorker {
                 email_failures: emailResults.length - successfulEmails
             });
 
-            console.log(`✅ [BACKUP_WORKER] Daily backup completed: ${filename} (${transformedLogs.length} logs, sent to ${successfulEmails}/${adminEmails.length} admins)`);
+            //console.log(`✅ [BACKUP_WORKER] Daily backup completed: ${filename} (${transformedLogs.length} logs, sent to ${successfulEmails}/${adminEmails.length} admins)`);
 
             return {
                 success: true,
@@ -131,7 +131,7 @@ class LogBackupWorker {
             };
 
         } catch (error) {
-            console.error('❌ [BACKUP_WORKER] Error in daily backup:', error);
+            //console.error('❌ [BACKUP_WORKER] Error in daily backup:', error);
 
             // Log error
             await this.logBackupAction('AUTO_BACKUP_ERROR', {
@@ -148,7 +148,7 @@ class LogBackupWorker {
 
     async performWeeklyCleanup() {
         try {
-            console.log('🧹 [BACKUP_WORKER] Starting weekly log cleanup...');
+            //console.log('🧹 [BACKUP_WORKER] Starting weekly log cleanup...');
 
             const retentionDays = parseInt(await this.getEnvValue('OLD_LOG_RETENTION_DAYS', '30'));
             const cutoffDate = new Date();
@@ -162,12 +162,12 @@ class LogBackupWorker {
                 .lt('created_at', cutoffDateISO);
 
             if (countError) {
-                console.error('❌ [BACKUP_WORKER] Error counting old logs:', countError);
+                //console.error('❌ [BACKUP_WORKER] Error counting old logs:', countError);
                 throw new Error('Failed to count old logs');
             }
 
             if (!count || count === 0) {
-                console.log('ℹ️ [BACKUP_WORKER] No old logs to cleanup');
+                //console.log('ℹ️ [BACKUP_WORKER] No old logs to cleanup');
                 return { skipped: true, reason: 'No old logs found' };
             }
 
@@ -178,7 +178,7 @@ class LogBackupWorker {
                 .lt('created_at', cutoffDateISO);
 
             if (deleteError) {
-                console.error('❌ [BACKUP_WORKER] Error deleting old logs:', deleteError);
+                //console.error('❌ [BACKUP_WORKER] Error deleting old logs:', deleteError);
                 throw new Error('Failed to delete old logs');
             }
 
@@ -190,7 +190,7 @@ class LogBackupWorker {
                 retention_days: retentionDays
             });
 
-            console.log(`✅ [BACKUP_WORKER] Weekly cleanup completed: ${actualDeleted || count} old logs deleted (older than ${retentionDays} days)`);
+            //console.log(`✅ [BACKUP_WORKER] Weekly cleanup completed: ${actualDeleted || count} old logs deleted (older than ${retentionDays} days)`);
 
             // Notify admins about cleanup
             const adminEmails = await this.getAdminEmails();
@@ -204,7 +204,7 @@ class LogBackupWorker {
                     });
                     return { email: adminEmail.email, success: true };
                 } catch (emailError) {
-                    console.error(`❌ [BACKUP_WORKER] Failed to send cleanup notification to ${adminEmail.email}:`, emailError);
+                    //console.error(`❌ [BACKUP_WORKER] Failed to send cleanup notification to ${adminEmail.email}:`, emailError);
                     return { email: adminEmail.email, success: false, error: emailError.message };
                 }
             });
@@ -222,7 +222,7 @@ class LogBackupWorker {
             };
 
         } catch (error) {
-            console.error('❌ [BACKUP_WORKER] Error in weekly cleanup:', error);
+            //console.error('❌ [BACKUP_WORKER] Error in weekly cleanup:', error);
 
             await this.logBackupAction('AUTO_CLEANUP_ERROR', {
                 error: error.message,
@@ -244,13 +244,13 @@ class LogBackupWorker {
                 .eq('is_verified', true);
 
             if (error) {
-                console.error('Error fetching admin emails:', error);
+                //console.error('Error fetching admin emails:', error);
                 return [];
             }
 
             return data || [];
         } catch (error) {
-            console.error('Error in getAdminEmails:', error);
+            //console.error('Error in getAdminEmails:', error);
             return [];
         }
     }
@@ -260,7 +260,7 @@ class LogBackupWorker {
             const value = await getEnv(key);
             return value.replace(/^"(.*)"$/, '$1'); // Remove quotes if present
         } catch (error) {
-            console.warn(`Environment variable ${key} not found, using default:`, defaultValue);
+            //console.warn(`Environment variable ${key} not found, using default:`, defaultValue);
             return defaultValue;
         }
     }
@@ -276,7 +276,7 @@ class LogBackupWorker {
                 .not('detail', 'is', null);
 
             if (error) {
-                console.warn('Error checking version number:', error);
+                //console.warn('Error checking version number:', error);
                 return 1;
             }
 
@@ -304,7 +304,7 @@ class LogBackupWorker {
 
             return maxVersion + 1;
         } catch (error) {
-            console.warn('Error in getNextVersionNumberFixed:', error);
+            //console.warn('Error in getNextVersionNumberFixed:', error);
             return 1;
         }
     }
@@ -316,7 +316,7 @@ class LogBackupWorker {
                 return 0;
             }
 
-            console.log(`🧹 [BACKUP_WORKER] Starting batch cleanup for ${logIds.length} logs`);
+            //console.log(`🧹 [BACKUP_WORKER] Starting batch cleanup for ${logIds.length} logs`);
 
             // Process in smaller batches to avoid 414 error
             const batchSize = 100; // Process 100 IDs at a time
@@ -332,14 +332,14 @@ class LogBackupWorker {
                         .in('id', batch);
 
                     if (error) {
-                        console.error(`Error deleting batch ${i / batchSize + 1}:`, error);
+                        //console.error(`Error deleting batch ${i / batchSize + 1}:`, error);
                         throw error;
                     }
 
                     const batchDeleted = count || 0;
                     totalDeleted += batchDeleted;
 
-                    console.log(`✅ [BACKUP_WORKER] Batch ${i / batchSize + 1}: Deleted ${batchDeleted} logs`);
+                    //console.log(`✅ [BACKUP_WORKER] Batch ${i / batchSize + 1}: Deleted ${batchDeleted} logs`);
 
                     // Small delay between batches to avoid overwhelming the database
                     if (i + batchSize < logIds.length) {
@@ -347,16 +347,16 @@ class LogBackupWorker {
                     }
 
                 } catch (batchError) {
-                    console.error(`❌ [BACKUP_WORKER] Error in batch ${i / batchSize + 1}:`, batchError);
+                    //console.error(`❌ [BACKUP_WORKER] Error in batch ${i / batchSize + 1}:`, batchError);
                     throw batchError;
                 }
             }
 
-            console.log(`✅ [BACKUP_WORKER] Batch cleanup completed: ${totalDeleted} total logs deleted`);
+            //console.log(`✅ [BACKUP_WORKER] Batch cleanup completed: ${totalDeleted} total logs deleted`);
             return totalDeleted;
 
         } catch (error) {
-            console.error('Error in cleanupLogsBatch:', error);
+            //console.error('Error in cleanupLogsBatch:', error);
             throw new Error(`Failed to delete logs from database: ${error.message}`);
         }
     }
@@ -374,10 +374,10 @@ class LogBackupWorker {
                 });
 
             if (error) {
-                console.error('Error logging backup action:', error);
+                //console.error('Error logging backup action:', error);
             }
         } catch (error) {
-            console.error('Error in logBackupAction:', error);
+            //console.error('Error in logBackupAction:', error);
         }
     }
 
@@ -389,11 +389,11 @@ class LogBackupWorker {
                 try {
                     await sendBackupErrorEmail(adminEmail.email, error);
                 } catch (emailError) {
-                    console.error(`Failed to send error notification to ${adminEmail.email}:`, emailError);
+                    //console.error(`Failed to send error notification to ${adminEmail.email}:`, emailError);
                 }
             }
         } catch (err) {
-            console.error('Error notifying backup error:', err);
+            //console.error('Error notifying backup error:', err);
         }
     }
 
@@ -439,27 +439,27 @@ const logBackupWorker = new LogBackupWorker();
 
 // Export as functions for compatibility with your existing worker system
 async function runDailyBackup() {
-    console.log(`[${new Date().toISOString()}] Starting daily backup worker...`);
+    //console.log(`[${new Date().toISOString()}] Starting daily backup worker...`);
 
     try {
         const result = await logBackupWorker.triggerDailyBackup();
-        console.log(`[${new Date().toISOString()}] Daily backup worker completed successfully`);
+        //console.log(`[${new Date().toISOString()}] Daily backup worker completed successfully`);
         return result;
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] Daily backup worker failed:`, error);
+        //console.error(`[${new Date().toISOString()}] Daily backup worker failed:`, error);
         throw error;
     }
 }
 
 async function runWeeklyCleanup() {
-    console.log(`[${new Date().toISOString()}] Starting weekly cleanup worker...`);
+    //console.log(`[${new Date().toISOString()}] Starting weekly cleanup worker...`);
 
     try {
         const result = await logBackupWorker.triggerWeeklyCleanup();
-        console.log(`[${new Date().toISOString()}] Weekly cleanup worker completed successfully`);
+        //console.log(`[${new Date().toISOString()}] Weekly cleanup worker completed successfully`);
         return result;
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] Weekly cleanup worker failed:`, error);
+        //console.error(`[${new Date().toISOString()}] Weekly cleanup worker failed:`, error);
         throw error;
     }
 }

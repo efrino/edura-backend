@@ -74,7 +74,7 @@ module.exports = {
 
                         return profileData;
                     } catch (err) {
-                        console.error('🔥 Error GET /profile', err);
+                        //console.error('🔥 Error GET /profile', err);
                         return h.response({ error: 'Failed to fetch profile' }).code(500);
                     }
                 },
@@ -125,7 +125,7 @@ module.exports = {
 
                         return { message: 'Profile updated successfully' };
                     } catch (err) {
-                        console.error('🔥 Error PUT /profile', err);
+                        //console.error('🔥 Error PUT /profile', err);
                         return h.response({ error: 'Failed to update profile' }).code(500);
                     }
                 },
@@ -168,7 +168,7 @@ module.exports = {
 
                         return { message: 'User deleted successfully' };
                     } catch (err) {
-                        console.error('🔥 Error DELETE /users', err);
+                        //console.error('🔥 Error DELETE /users', err);
                         return h.response({ error: 'Failed to delete user' }).code(500);
                     }
                 },

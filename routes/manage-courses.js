@@ -60,7 +60,7 @@ module.exports = {
                         const { data, error, count } = await query;
 
                         if (error) {
-                            console.error('Database error:', error);
+                            //console.error('Database error:', error);
                             throw error;
                         }
 
@@ -71,7 +71,7 @@ module.exports = {
                             totalPages: Math.ceil((count || 0) / limit),
                         };
                     } catch (error) {
-                        console.error('Error in GET /admin/courses:', error);
+                        //console.error('Error in GET /admin/courses:', error);
                         throw Boom.internal('Failed to fetch courses');
                     }
                 }
@@ -103,7 +103,7 @@ module.exports = {
                             .maybeSingle();
 
                         if (courseErr) {
-                            console.error('Error fetching course:', courseErr);
+                            //console.error('Error fetching course:', courseErr);
                             throw courseErr;
                         }
 
@@ -119,7 +119,7 @@ module.exports = {
                             .order('session_number', { ascending: true });
 
                         if (sessionErr) {
-                            console.error('Error fetching sessions:', sessionErr);
+                            //console.error('Error fetching sessions:', sessionErr);
                             throw sessionErr;
                         }
 
@@ -128,7 +128,7 @@ module.exports = {
                             sessions: sessions || []
                         };
                     } catch (error) {
-                        console.error('Error in GET /admin/courses/{id}:', error);
+                        //console.error('Error in GET /admin/courses/{id}:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Failed to fetch course detail');
                     }
@@ -169,7 +169,7 @@ module.exports = {
                             .maybeSingle();
 
                         if (checkError) {
-                            console.error('Error checking course:', checkError);
+                            //console.error('Error checking course:', checkError);
                             throw checkError;
                         }
 
@@ -185,13 +185,13 @@ module.exports = {
                             .eq('id', id);
 
                         if (error) {
-                            console.error('Error updating course:', error);
+                            //console.error('Error updating course:', error);
                             throw error;
                         }
 
                         return { message: 'Course berhasil diupdate' };
                     } catch (error) {
-                        console.error('Error in PUT /admin/courses/{id}:', error);
+                        //console.error('Error in PUT /admin/courses/{id}:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Failed to update course');
                     }
@@ -216,7 +216,7 @@ module.exports = {
                             .order('created_at', { ascending: false });
 
                         if (error) {
-                            console.error('Error fetching courses for export:', error);
+                            //console.error('Error fetching courses for export:', error);
                             throw error;
                         }
 
@@ -242,7 +242,7 @@ module.exports = {
                             .type('text/csv')
                             .header('Content-Disposition', `attachment; filename=courses-${Date.now()}.csv`);
                     } catch (error) {
-                        console.error('Error exporting courses:', error);
+                        //console.error('Error exporting courses:', error);
                         throw Boom.internal('Failed to export courses');
                     }
                 }
@@ -265,7 +265,7 @@ module.exports = {
                             .select('level, is_verified, created_at');
 
                         if (error) {
-                            console.error('Error fetching courses for statistics:', error);
+                            //console.error('Error fetching courses for statistics:', error);
                             throw error;
                         }
 
@@ -286,7 +286,7 @@ module.exports = {
 
                         return stats;
                     } catch (error) {
-                        console.error('Error getting course statistics:', error);
+                        //console.error('Error getting course statistics:', error);
                         throw Boom.internal('Failed to get statistics');
                     }
                 }
@@ -309,14 +309,14 @@ module.exports = {
                             .not('subject', 'is', null);
 
                         if (error) {
-                            console.error('Error fetching subjects:', error);
+                            //console.error('Error fetching subjects:', error);
                             throw error;
                         }
 
                         const subjects = [...new Set((courses || []).map(c => c.subject).filter(Boolean))].sort();
                         return subjects;
                     } catch (error) {
-                        console.error('Error getting unique subjects:', error);
+                        //console.error('Error getting unique subjects:', error);
                         throw Boom.internal('Failed to get subjects');
                     }
                 }
@@ -339,14 +339,14 @@ module.exports = {
                             .not('program_studi', 'is', null);
 
                         if (error) {
-                            console.error('Error fetching program studi:', error);
+                            //console.error('Error fetching program studi:', error);
                             throw error;
                         }
 
                         const programs = [...new Set((courses || []).map(c => c.program_studi).filter(Boolean))].sort();
                         return programs;
                     } catch (error) {
-                        console.error('Error getting unique program studi:', error);
+                        //console.error('Error getting unique program studi:', error);
                         throw Boom.internal('Failed to get program studi');
                     }
                 }
@@ -378,7 +378,7 @@ module.exports = {
                             .maybeSingle();
 
                         if (checkError) {
-                            console.error('Error checking course:', checkError);
+                            //console.error('Error checking course:', checkError);
                             throw checkError;
                         }
 
@@ -393,7 +393,7 @@ module.exports = {
                             .eq('id', id);
 
                         if (error) {
-                            console.error('Error deleting course:', error);
+                            //console.error('Error deleting course:', error);
                             throw error;
                         }
 
@@ -402,7 +402,7 @@ module.exports = {
                             deletedCourse: existingCourse.title
                         };
                     } catch (error) {
-                        console.error('Error in DELETE /admin/courses/{id}:', error);
+                        //console.error('Error in DELETE /admin/courses/{id}:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Failed to delete course');
                     }

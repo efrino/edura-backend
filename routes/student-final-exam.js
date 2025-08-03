@@ -460,7 +460,7 @@ Gabungkan seluruh materi berikut:\n\n${sessions.map(s => `Judul: ${s.title}\nMat
                         current_user_rank: leaderboard.find(entry => entry.isCurrentUser)?.rank || null
                     });
                 } catch (err) {
-                    console.error('🔥 Error leaderboard:', err);
+                    //console.error('🔥 Error leaderboard:', err);
                     return Boom.internal('Gagal mengambil leaderboard');
                 }
             },

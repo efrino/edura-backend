@@ -24,7 +24,7 @@ module.exports = {
                         .rpc('get_enum_values', { enum_name: 'perguruan_tinggi_enum' });
 
                     if (programStudiError || perguruanTinggiError) {
-                        console.error('Error fetching enums:', { programStudiError, perguruanTinggiError });
+                        //console.error('Error fetching enums:', { programStudiError, perguruanTinggiError });
                         throw Boom.internal('Gagal mengambil data enum');
                     }
 
@@ -33,7 +33,7 @@ module.exports = {
                         perguruan_tinggi: perguruanTinggiData || []
                     };
                 } catch (error) {
-                    console.error('Error in /enums handler:', error);
+                    //console.error('Error in /enums handler:', error);
 
                     // Fallback ke data hardcoded jika ada masalah dengan database
                     const fallbackProgramStudi = [
@@ -78,7 +78,7 @@ module.exports = {
                         'Bina Sarana Informatika'
                     ];
 
-                    console.log('Using fallback enum data');
+                    //console.log('Using fallback enum data');
                     return {
                         program_studi: fallbackProgramStudi,
                         perguruan_tinggi: fallbackPerguruanTinggi
@@ -102,7 +102,7 @@ module.exports = {
             },
             handler: async (request, h) => {
                 const { code } = request.query;
-                console.log(`🔍 Mencari info kelas untuk kode: ${code}`);
+                //console.log(`🔍 Mencari info kelas untuk kode: ${code}`);
 
                 const { data, error } = await db
                     .from('classes')

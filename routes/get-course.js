@@ -37,7 +37,7 @@ module.exports = {
                     .single();
 
                 if (userError || !userData) {
-                    console.error(userError);
+                    //console.error(userError);
                     return h.response({ message: 'Gagal mengambil data user' }).code(500);
                 }
 
@@ -50,7 +50,7 @@ module.exports = {
                     .eq('student_id', userId);
 
                 if (takenError) {
-                    console.error(takenError);
+                    //console.error(takenError);
                     return h.response({ message: 'Gagal mengambil data student_courses' }).code(500);
                 }
 
@@ -76,7 +76,7 @@ module.exports = {
                 const { data: courses, error: courseError } = await query;
 
                 if (courseError) {
-                    console.error(courseError);
+                    //console.error(courseError);
                     return h.response({ message: 'Gagal mengambil rekomendasi course' }).code(500);
                 }
 

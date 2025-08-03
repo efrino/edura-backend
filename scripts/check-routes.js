@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 function checkRoutes() {
-    console.log('🔍 Checking Route Conflicts...\n');
+    //console.log('🔍 Checking Route Conflicts...\n');
 
     const routesDir = path.join(__dirname, '../routes');
     const routeFiles = fs.readdirSync(routesDir).filter(f => f.endsWith('.js'));
@@ -13,7 +13,7 @@ function checkRoutes() {
     const conflicts = [];
 
     routeFiles.forEach(file => {
-        console.log(`📁 Checking ${file}...`);
+        //console.log(`📁 Checking ${file}...`);
 
         try {
             const filePath = path.join(routesDir, file);
@@ -39,21 +39,21 @@ function checkRoutes() {
             }
 
         } catch (error) {
-            console.error(`❌ Error reading ${file}:`, error.message);
+            //console.error(`❌ Error reading ${file}:`, error.message);
         }
     });
 
-    console.log(`\n📊 Found ${allRoutes.length} total routes in ${routeFiles.length} files`);
+    //console.log(`\n📊 Found ${allRoutes.length} total routes in ${routeFiles.length} files`);
 
     if (conflicts.length > 0) {
-        console.log('\n⚠️ Route Conflicts Found:');
+        //console.log('\n⚠️ Route Conflicts Found:');
         conflicts.forEach(conflict => {
-            console.log(`   Path: ${conflict.path}`);
-            console.log(`   Files: ${conflict.files.join(' vs ')}`);
+            //console.log(`   Path: ${conflict.path}`);
+            //console.log(`   Files: ${conflict.files.join(' vs ')}`);
         });
-        console.log('\n❌ Please resolve conflicts before proceeding');
+        //console.log('\n❌ Please resolve conflicts before proceeding');
     } else {
-        console.log('\n✅ No route conflicts detected');
+        //console.log('\n✅ No route conflicts detected');
     }
 
     // Show backup-related routes
@@ -64,9 +64,9 @@ function checkRoutes() {
     );
 
     if (backupRoutes.length > 0) {
-        console.log('\n📦 Backup-related routes found:');
+        //console.log('\n📦 Backup-related routes found:');
         backupRoutes.forEach(route => {
-            console.log(`   ${route.path} (${route.file})`);
+            //console.log(`   ${route.path} (${route.file})`);
         });
     }
 }

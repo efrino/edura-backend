@@ -125,7 +125,7 @@ module.exports = {
                     .single();
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal membuat user' }).code(500);
                 }
 
@@ -140,7 +140,7 @@ module.exports = {
                             role: role
                         });
                     } catch (emailError) {
-                        console.error('Failed to send credentials email:', emailError);
+                        //console.error('Failed to send credentials email:', emailError);
                         // Anda bisa menambahkan log atau penanganan error di sini,
                         // namun proses pembuatan user tetap berhasil.
                     }
@@ -219,7 +219,7 @@ module.exports = {
                     .single();
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal update user' }).code(500);
                 }
 
@@ -271,7 +271,7 @@ module.exports = {
                     .eq('id', userId);
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal menghapus user' }).code(500);
                 }
 
@@ -323,7 +323,7 @@ module.exports = {
                     .eq('id', userId);
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal reset password' }).code(500);
                 }
 
@@ -342,7 +342,7 @@ module.exports = {
                             `
                         });
                     } catch (emailError) {
-                        console.error('Failed to send password reset email:', emailError);
+                        //console.error('Failed to send password reset email:', emailError);
                     }
                 }
 
@@ -391,7 +391,7 @@ module.exports = {
                         });
 
                         if (parsed.errors.length > 0) {
-                            console.error(parsed.errors);
+                            //console.error(parsed.errors);
                             return resolve(h.response({ message: 'Format CSV tidak valid' }).code(400));
                         }
 
@@ -456,7 +456,7 @@ module.exports = {
                     });
 
                     file.on('error', (err) => {
-                        console.error(err);
+                        //console.error(err);
                         return reject(h.response({ message: 'Gagal membaca file' }).code(500));
                     });
                 });
@@ -488,7 +488,7 @@ module.exports = {
                     const { data, count, error } = await getUserListByRole(role, page, limit, search);
 
                     if (error) {
-                        console.error(error);
+                        //console.error(error);
                         return h.response({ message: `Gagal mengambil daftar ${role}` }).code(500);
                     }
 
@@ -534,7 +534,7 @@ module.exports = {
                 const { data, error } = await query;
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal export data' }).code(500);
                 }
 

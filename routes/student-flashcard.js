@@ -44,7 +44,7 @@ module.exports = {
                         flashcards: data,
                     }).code(200);
                 } catch (err) {
-                    console.error('🔥 Error fetching student flashcards:', err);
+                    //console.error('🔥 Error fetching student flashcards:', err);
                     return Boom.internal('Failed to fetch student flashcards');
                 }
             },
@@ -76,7 +76,7 @@ module.exports = {
                         .maybeSingle();
 
                     if (error) {
-                        console.error('🔥 Error checking flashcard status:', error.message);
+                        //console.error('🔥 Error checking flashcard status:', error.message);
                         return Boom.internal('Failed to check flashcard status');
                     }
 
@@ -93,7 +93,7 @@ module.exports = {
                         message: `Status: ${data.status}`,
                     }).code(200);
                 } catch (err) {
-                    console.error('🔥 Error checking status:', err);
+                    //console.error('🔥 Error checking status:', err);
                     return Boom.internal('Failed to check status');
                 }
             },
@@ -228,7 +228,7 @@ Materi: ${content}
                     }
 
                 } catch (err) {
-                    console.error('❌ Error:', err.message);
+                    //console.error('❌ Error:', err.message);
                     await supabase.from('student_flashcard_status').update({
                         status: 'failed', updated_at: new Date().toISOString()
                     }).eq('student_id', student_id).eq('course_id', course_id);

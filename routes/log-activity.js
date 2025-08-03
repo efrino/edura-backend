@@ -1,94 +1,3 @@
-// // === Solusi 1: Tanpa Joi Validation (Paling Sederhana) ===
-// const { verifyToken, requireRole } = require('../utils/middleware');
-// const db = require('../db');
-
-// module.exports = {
-//     name: 'activity-log-endpoint',
-//     register: async function (server) {
-//         server.route({
-//             method: 'GET',
-//             path: '/admin/activity-logs',
-//             options: {
-//                 tags: ['api', 'Admin'],
-//                 description: 'Mengambil log aktivitas sistem berdasarkan tanggal',
-//                 pre: [verifyToken, requireRole('admin')],
-//             },
-//             handler: async (request, h) => {
-//                 try {
-//                     const { date } = request.query;
-
-//                     // Manual validation
-//                     if (!date) {
-//                         return h.response({ 
-//                             error: 'Parameter date wajib diisi' 
-//                         }).code(400);
-//                     }
-
-//                     // Validate date format
-//                     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-//                     if (!dateRegex.test(date)) {
-//                         return h.response({ 
-//                             error: 'Format tanggal tidak valid. Gunakan format YYYY-MM-DD' 
-//                         }).code(400);
-//                     }
-
-//                     // Additional date validation
-//                     const parsedDate = new Date(date);
-//                     if (isNaN(parsedDate.getTime())) {
-//                         return h.response({ 
-//                             error: 'Tanggal tidak valid' 
-//                         }).code(400);
-//                     }
-
-//                     // Query database
-//                     const { data, error } = await db
-//                         .from('activity_logs')
-//                         .select(`
-//                             id,
-//                             user_id,
-//                             role,
-//                             action,
-//                             detail,
-//                             created_at,
-//                             users!fk_user_id ( full_name )
-//                         `)
-//                         .gte('created_at', `${date}T00:00:00.000Z`)
-//                         .lte('created_at', `${date}T23:59:59.999Z`)
-//                         .order('created_at', { ascending: false });
-
-//                     if (error) {
-//                         console.error('Database error:', error);
-//                         return h.response({ 
-//                             error: 'Gagal mengambil data log dari database' 
-//                         }).code(500);
-//                     }
-
-//                     // Transform data
-//                     const logs = data.map(log => ({
-//                         id: log.id,
-//                         user_fullname: log.users?.full_name || null,
-//                         role: log.role,
-//                         action: log.action,
-//                         detail: log.detail,
-//                         created_at: log.created_at,
-//                     }));
-
-//                     return h.response({ 
-//                         logs,
-//                         count: logs.length,
-//                         date: date
-//                     }).code(200);
-
-//                 } catch (error) {
-//                     console.error('Unexpected error in activity logs endpoint:', error);
-//                     return h.response({ 
-//                         error: 'Terjadi kesalahan internal server' 
-//                     }).code(500);
-//                 }
-//             },
-//         });
-//     },
-// };
 // routes/admin-log-backup.js - FIXED VERSION
 const Joi = require('joi');
 const Boom = require('@hapi/boom');
@@ -139,7 +48,7 @@ module.exports = {
                             .range(offset, offset + limit - 1);
 
                         if (error) {
-                            console.error('Database error:', error);
+                            //console.error('Database error:', error);
                             throw Boom.internal('Gagal mengambil data log dari database');
                         }
 
@@ -162,7 +71,7 @@ module.exports = {
                         };
 
                     } catch (error) {
-                        console.error('Error in activity logs endpoint:', error);
+                        //console.error('Error in activity logs endpoint:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Terjadi kesalahan internal server');
                     }
@@ -209,7 +118,7 @@ module.exports = {
                             .order('created_at', { ascending: false });
 
                         if (error) {
-                            console.error('Database error:', error);
+                            //console.error('Database error:', error);
                             throw Boom.internal('Gagal mengambil data log dari database');
                         }
 
@@ -296,7 +205,7 @@ module.exports = {
                             .header('X-Backup-Date', date);
 
                     } catch (error) {
-                        console.error('Error in backup endpoint:', error);
+                        //console.error('Error in backup endpoint:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Gagal membuat backup log');
                     }
@@ -335,7 +244,7 @@ module.exports = {
                             .lte('created_at', `${date}T23:59:59.999Z`);
 
                         if (fetchError) {
-                            console.error('Error fetching logs for cleanup:', fetchError);
+                            //console.error('Error fetching logs for cleanup:', fetchError);
                             throw Boom.internal('Gagal mengambil data log');
                         }
 
@@ -360,7 +269,7 @@ module.exports = {
                         };
 
                     } catch (error) {
-                        console.error('Error in cleanup endpoint:', error);
+                        //console.error('Error in cleanup endpoint:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Gagal menghapus log');
                     }
@@ -401,7 +310,7 @@ module.exports = {
                             .range(offset, offset + limit - 1);
 
                         if (error) {
-                            console.error('Error fetching backup history:', error);
+                            //console.error('Error fetching backup history:', error);
                             throw Boom.internal('Gagal mengambil riwayat backup');
                         }
 
@@ -421,7 +330,7 @@ module.exports = {
                         };
 
                     } catch (error) {
-                        console.error('Error in backup history endpoint:', error);
+                        //console.error('Error in backup history endpoint:', error);
                         if (error.isBoom) throw error;
                         throw Boom.internal('Gagal mengambil riwayat backup');
                     }
@@ -444,7 +353,7 @@ async function getNextVersionNumberFixed(date) {
             .not('detail', 'is', null);
 
         if (error) {
-            console.warn('Error checking version number:', error);
+            //console.warn('Error checking version number:', error);
             return 1;
         }
 
@@ -472,7 +381,7 @@ async function getNextVersionNumberFixed(date) {
 
         return maxVersion + 1;
     } catch (error) {
-        console.warn('Error in getNextVersionNumberFixed:', error);
+        //console.warn('Error in getNextVersionNumberFixed:', error);
         return 1;
     }
 }
@@ -484,7 +393,7 @@ async function cleanupLogsBatch(logIds, date) {
             return 0;
         }
 
-        console.log(`🧹 Starting batch cleanup for ${logIds.length} logs on ${date}`);
+        //console.log(`🧹 Starting batch cleanup for ${logIds.length} logs on ${date}`);
 
         // Process in smaller batches to avoid 414 error
         const batchSize = 100; // Process 100 IDs at a time
@@ -500,14 +409,14 @@ async function cleanupLogsBatch(logIds, date) {
                     .in('id', batch);
 
                 if (error) {
-                    console.error(`Error deleting batch ${i / batchSize + 1}:`, error);
+                    //console.error(`Error deleting batch ${i / batchSize + 1}:`, error);
                     throw error;
                 }
 
                 const batchDeleted = count || 0;
                 totalDeleted += batchDeleted;
 
-                console.log(`✅ Batch ${i / batchSize + 1}: Deleted ${batchDeleted} logs`);
+                //console.log(`✅ Batch ${i / batchSize + 1}: Deleted ${batchDeleted} logs`);
 
                 // Small delay between batches to avoid overwhelming the database
                 if (i + batchSize < logIds.length) {
@@ -515,16 +424,16 @@ async function cleanupLogsBatch(logIds, date) {
                 }
 
             } catch (batchError) {
-                console.error(`❌ Error in batch ${i / batchSize + 1}:`, batchError);
+                //console.error(`❌ Error in batch ${i / batchSize + 1}:`, batchError);
                 throw batchError;
             }
         }
 
-        console.log(`✅ Batch cleanup completed: ${totalDeleted} total logs deleted for date ${date}`);
+        //console.log(`✅ Batch cleanup completed: ${totalDeleted} total logs deleted for date ${date}`);
         return totalDeleted;
 
     } catch (error) {
-        console.error('Error in cleanupLogsBatch:', error);
+        //console.error('Error in cleanupLogsBatch:', error);
         throw new Error(`Gagal menghapus log dari database: ${error.message}`);
     }
 }
@@ -542,9 +451,9 @@ async function logBackupAction(userId, action, detail) {
             });
 
         if (error) {
-            console.error('Error logging backup action:', error);
+            //console.error('Error logging backup action:', error);
         }
     } catch (error) {
-        console.error('Error in logBackupAction:', error);
+        //console.error('Error in logBackupAction:', error);
     }
 }

@@ -40,7 +40,7 @@ module.exports = {
                     .eq('student_id', studentId);
 
                 if (error) {
-                    console.error(error);
+                    //console.error(error);
                     return h.response({ message: 'Gagal mengambil data course' }).code(500);
                 }
 
@@ -52,7 +52,7 @@ module.exports = {
                     .in('course_id', courseIds);
 
                 if (sessionError) {
-                    console.error(sessionError);
+                    //console.error(sessionError);
                     return h.response({ message: 'Gagal mengambil data sesi' }).code(500);
                 }
 
@@ -120,7 +120,7 @@ module.exports = {
                     .eq('course_id', courseId);
 
                 if (sessionError) {
-                    console.error(sessionError);
+                    //console.error(sessionError);
                     return h.response({ message: 'Gagal mengambil data sesi' }).code(500);
                 }
 
@@ -133,7 +133,7 @@ module.exports = {
                     .single();
 
                 if (progressError) {
-                    console.error(progressError);
+                    //console.error(progressError);
                     return h.response({ message: 'Gagal mengambil progres saat ini' }).code(500);
                 }
 
@@ -168,7 +168,7 @@ module.exports = {
                     .eq('course_id', courseId);
 
                 if (updateError) {
-                    console.error(updateError);
+                    //console.error(updateError);
                     return h.response({ message: 'Gagal update checkpoint' }).code(500);
                 }
 
