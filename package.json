@@ -1,23 +1,39 @@
 {
   "name": "backend-edura",
   "version": "1.0.0",
-  "description": "",
+  "description": "Edura Backend with secure PDF generation",
   "scripts": {
-    "dev": "nodemon server.js && npm run jobs",
-    "start": "node server.js && npm run jobs",
+    "dev": "nodemon server.js && npm run jobs && npm run setup:images",
+    "start": "node server.js && npm run jobs && npm run setup:images",
     "jobs": "node worker/generate-sessions-worker.js",
-     "backup:test": "node scripts/test-backup.js",
+    "start:with-jobs": "npm-run-all --parallel start jobs",
+    
+    "backup:test": "node scripts/test-backup.js",
     "backup:status": "node scripts/backup-status.js",
     "backup:trigger": "node scripts/trigger-backup.js",
     "backup:cleanup": "node scripts/cleanup-old-logs.js",
     "backup:check-routes": "node scripts/check-routes.js",
-    "backup:db-test": "node scripts/test-database.js"
+    "backup:db-test": "node scripts/test-database.js",
+    
+    "test:certificate": "node scripts/test-certificate.js",
+    "monitor:certificate": "node scripts/monitor-certificate.js",
+    "monitor:continuous": "node scripts/monitor-certificate.js continuous",
+    "monitor:single": "node scripts/monitor-certificate.js single",
+    
+     "setup:images": "node utils/convert-images-to-base64.js",
+
+    "health:check": "curl -f http://localhost:8080/health || curl -f http://localhost:10000/health || exit 1",
+    "health:detailed": "curl -f http://localhost:8080/health/detailed || curl -f http://localhost:10000/health/detailed || exit 1",
+    
+    "build": "echo 'Build completed'",
+    "deploy": "gcloud builds submit --tag gcr.io/$GOOGLE_CLOUD_PROJECT/backend-edura",
+    "deploy:cloudrun": "./deploy-cloudrun.sh"
   },
-  "keywords": [],
+  "keywords": ["education", "lms", "gemini-ai", "hapi", "quiz", "flashcards", "edura"],
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "",
+  "author": "Edura Team",
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^1.9.0",
@@ -41,10 +57,14 @@
     "pg": "^8.16.0",
     "puppeteer": "^24.12.1",
     "string-similarity": "^4.0.4",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    
+    "pdfkit": "^0.15.0",
+    "playwright": "^1.48.0",
+    "npm-run-all": "^4.1.5"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^3.1.10"
   },
   "type": "commonjs"
 }
